@@ -8,9 +8,21 @@ export interface WorkspacePackage {
   packageJsonPath: string;
   peerDependencies: Record<string, string>;
   dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+  /** The manifest exactly as written, so field discovery reads the source. */
+  manifest: Record<string, unknown>;
 }
 
-export type FindingKind = "root-launcher-mismatch" | "workspace-source-drift" | "workspace-lockstep" | "peer-dep-violation" | "peer-dep-lockstep" | "skipped";
+export type FindingKind =
+  | "root-launcher-mismatch"
+  | "workspace-source-drift"
+  | "workspace-lockstep"
+  | "peer-dep-violation"
+  | "peer-dep-lockstep"
+  | "consumer-lockstep"
+  | "unsupported-range"
+  | "invalid-workspace-version"
+  | "skipped";
 
 export interface Finding {
   kind: FindingKind;
@@ -28,6 +40,9 @@ export function loadWorkspacePackages(options?: AuditOptions): Promise<Map<strin
 export function satisfies(version: string, range: string): boolean | null;
 
 export function auditLauncherSync(options?: AuditOptions): Promise<Finding[]>;
+
+/** Invariant 6: every manifest's internal dep ranges vs the workspace source. */
+export function auditConsumerLockstep(input: { root: string; rootPkg: Record<string, unknown>; workspaces: Map<string, WorkspacePackage> }): Finding[];
 
 /** CLI entry point. Returns 0 clean, 1 if any non-skipped finding present. */
 export function main(): Promise<number>;

@@ -190,6 +190,28 @@ export function computeFirstPartyClosure(packages, rootName) {
   return closure;
 }
 
+// `npm pack --json` does not have one output shape. npm 11 and earlier emit an
+// ARRAY of results; npm 12 emits an OBJECT KEYED BY PACKAGE NAME, and a flat
+// `{ filename }` also turns up. Reading only the first two forms made npm 12
+// fail with "produced no filename" on a pack that had in fact succeeded — and
+// since this stage is the documented go/no-go for every launcher release, the
+// gate would have broken for everyone the moment CI's runners moved to npm 12.
+// Take the first entry that carries a filename, whichever shape it arrives in.
+export function packFilenameFrom(stdout) {
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    return null;
+  }
+  const candidates = Array.isArray(parsed) ? parsed : [parsed, ...Object.values(parsed ?? {})];
+  for (const entry of candidates) {
+    const filename = entry?.filename;
+    if (typeof filename === "string" && filename.length > 0) return filename;
+  }
+  return null;
+}
+
 // `npm pack` one workspace package into `destDir` with --ignore-scripts (dist is
 // already built by the CI build step, so we archive it as-is rather than paying a
 // prepack rebuild per package). Returns the absolute tarball path.
@@ -200,8 +222,7 @@ async function packOneWorkspacePackage({ packageDir, destDir, runCommandImpl = r
   if (result.code !== 0 || result.timedOut) {
     throw new Error(`npm pack failed for ${packageDir} (code=${result.code}, timedOut=${result.timedOut})\n${result.stderr}`);
   }
-  const parsed = JSON.parse(result.stdout);
-  const filename = Array.isArray(parsed) ? parsed[0]?.filename : parsed?.filename;
+  const filename = packFilenameFrom(result.stdout);
   if (!filename) throw new Error(`npm pack produced no filename for ${packageDir}`);
   return path.join(destDir, filename);
 }

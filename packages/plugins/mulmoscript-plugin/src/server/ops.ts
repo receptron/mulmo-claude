@@ -19,6 +19,7 @@
 
 import { existsSync, mkdirSync, realpathSync, statSync, unlinkSync } from "fs";
 import path from "path";
+import type { FileOps } from "gui-chat-protocol";
 import {
   getFileObject,
   initializeContextFromFiles,
@@ -43,10 +44,11 @@ import {
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
 import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
-import { isAbsoluteStoryPath, normalizeStoryPath, STORY_TARGET_EXTENSIONS, storyRefWithin } from "../core/paths";
+import { isAbsoluteStoryPath, normalizeStoryPath, STORY_TARGET_EXTENSIONS, storyRefWithin, storiesRelativePath } from "../core/paths";
 import { errorMessage } from "@mulmoclaude/common";
 import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { fileToDataUri, stripDataUri } from "./support";
+import { missingRootCapabilities } from "./types";
 import { enableGraphAIErrorCapture, setMulmoErrorCaptureLogger, withMulmoErrorCapture } from "./mulmoErrorCapture";
 import type {
   GenerateOpArgsWith,
@@ -219,23 +221,31 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     }
     rootDirs.set(trimmed, path.resolve(dir));
   }
-  if (rootDirs.size > 1) {
-    // The pair identity is complete INSIDE this package, and stops at the host
-    // boundary. A host's per-session generation store keys on
-    // `(kind, filePath, key)` — `generationKey` in `@mulmobridge/protocol`,
-    // which bridges also consume — so two roots running the same generation in
-    // one session collapse to one entry and either finish clears the other's
-    // pending state (Codex P1 on #3015).
-    //
-    // Widening that key is a protocol change with its own consumers, so it is
-    // not this package's to make. Unreachable until a host registers a root,
-    // which is exactly the moment this fires: whoever first does it is the
-    // person who has to widen their session key, and they see this at boot
-    // rather than discovering it from a stuck spinner.
-    log.warn(
-      "extra stories roots registered — generation and writes are REFUSED in them until the host's per-session generation key includes the root (`generationKey` in @mulmobridge/protocol); reads work today (#3014 step 2)",
-      { roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT) },
-    );
+  warnAboutUnwiredRoots();
+
+  /**
+   * Tell a host which named-root capabilities it has not wired — and nothing
+   * when it has wired them all.
+   *
+   * The condition used to be the root COUNT alone, so a host that had passed
+   * `artifactsFor` was still told, at every boot, that its writes land in the
+   * default root. That is not a stale wording: it is the opposite of what the
+   * code then does, read by the hosts that got the wiring RIGHT (#3022, from
+   * the consuming host).
+   *
+   * Silence when nothing is missing, because a warning that always fires is
+   * one people learn to skip — and then the host that really did forget
+   * `artifactsFor` cannot tell either. Each clause is emitted only when that
+   * capability is actually absent, so the message says what is true for THIS
+   * host rather than what was true when it was written.
+   */
+  function warnAboutUnwiredRoots(): void {
+    if (rootDirs.size <= 1) return;
+    const missing = missingRootCapabilities(backend);
+    if (missing.length === 0) return;
+    log.warn(`extra stories roots registered — reads and uploads work, but ${missing.join(", and ")} (#3019)`, {
+      roots: [...rootDirs.keys()].filter((id) => id !== DEFAULT_ROOT),
+    });
   }
 
   /** The registered directory for a wire `root`, or null when the host never
@@ -490,14 +500,24 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * session would collapse to one entry, and either completion would clear the
    * other root's indicator (Codex P1 on #3015).
    *
-   * Widening that key is a protocol change with its own consumers, so it is not
-   * this package's to make. Refusing the generation is: a named root that
-   * cannot be tracked correctly must not start, rather than start and corrupt
-   * the other root's state. Same fail-closed shape as `guardStoryWriteRoot`,
-   * and step 2 replaces both once the protocol carries the root.
+   * Whose hazard it is decides who answers: a host declares
+   * `rootScopedGenerationState` when its own pending state carries the root —
+   * or when it keeps none, which is MulmoTerminal's case. It was refused for a
+   * collision it cannot have (#3019).
+   *
+   * Absent still refuses, so a host that has not thought about this keeps the
+   * shipped behaviour rather than being quietly opened up.
    */
   function guardStoryGenerationRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
+    // Registration BEFORE the host's opt-in. The flag says "this host can tell
+    // two roots apart", not "any id is addressable" — and the generation ops
+    // publish their start event before `runStoryOp` reaches `resolveStory`, so
+    // an unregistered root emitted a start/finish pair for work that never
+    // existed (Codex + CodeRabbit on #3020).
+    const registered = guardStoryRootRegistered(root);
+    if (registered) return registered;
+    if (backend.rootScopedGenerationState === true) return null;
     return opBadRequest("generating in a non-default stories root is not supported yet");
   }
 
@@ -520,14 +540,87 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * update executors run against one `FileOps`, bound by the host to the
    * default root, so a write naming another root would rewrite the DEFAULT
    * root's identically-named file and then announce the other one as changed
-   * (#3015 review G1). Closing it here is fail-closed: "readable but not yet
+   * (#3015 review G1). Closing it was fail-closed: "readable but not yet
    * writable" beats "wrote somewhere else and said so".
    *
-   * Step 2 replaces this with a per-root FileOps rather than removing it.
+   * It opens per root, not globally: the host answers `artifactsFor` for the
+   * roots it can serve, and a root it cannot is still refused. A host that
+   * wires nothing keeps the shipped refusal (#3019).
+   *
+   * The two refusals say different things because they are fixed in different
+   * places. No `artifactsFor` at all is a capability this host has not turned
+   * on. `artifactsFor` present but answering `null` for a REGISTERED root is a
+   * wiring mistake inside that host — and it is the quiet one, because the
+   * boot warning stays silent (the resolver WAS passed) while every write is
+   * refused. One message for both read as "the plugin cannot do this yet",
+   * which sends the host looking in the wrong place (#3024).
    */
   function guardStoryWriteRoot(root: string | undefined): OpFailure | null {
     if (normalizeRoot(root) === DEFAULT_ROOT) return null;
-    return opBadRequest("writing to a non-default stories root is not supported yet");
+    const registered = guardStoryRootRegistered(root);
+    if (registered) return registered;
+    if (artifactsForRoot(root) !== null) return null;
+    return backend.artifactsFor === undefined
+      ? opBadRequest("writing to a non-default stories root is not supported yet")
+      : opBadRequest(`this host's \`artifactsFor\` returned no FileOps for the registered stories root "${normalizeRoot(root)}"`);
+  }
+
+  /**
+   * The FileOps a write to this root must go through.
+   *
+   * The default root keeps the single `artifacts` it always had, byte for
+   * byte. A named root is served only when the host both REGISTERED it
+   * (`extraRoots` — the containment boundary, so a host cannot widen the
+   * addressable set through this back door) and can supply a FileOps for it.
+   */
+  function artifactsForRoot(root: string | undefined): FileOps | null {
+    const normalized = normalizeRoot(root);
+    if (normalized === DEFAULT_ROOT) return backend.artifacts;
+    if (rootDir(normalized) === null) return null;
+    const hostOps = backend.artifactsFor?.(normalized);
+    return hostOps === undefined || hostOps === null ? null : storiesScoped(hostOps);
+  }
+
+  /**
+   * Address a named root's FileOps the way the READ side addresses it.
+   *
+   * The two sides disagreed about one path segment, and the disagreement was
+   * silent. A read strips `stories/` and resolves under the registered
+   * directory (`<root>/<rel>`); a write handed the executors' wire path
+   * straight to the host's FileOps, which is rooted at that same registered
+   * directory, so the bytes landed in `<root>/stories/<rel>`. `save` then
+   * REPORTED SUCCESS and returned a wire path that could not be read back —
+   * a card pointing at nothing (#3020 review H1, from the consuming host).
+   *
+   * Stripping here makes "the directory you registered is the directory your
+   * FileOps is rooted at" true, which is what a host writes without being
+   * told. The default root is untouched: its FileOps is rooted one level up,
+   * at `<workspace>/artifacts`, and is shared with other plugins.
+   *
+   * A path that is not a stories wire path throws rather than passing
+   * through. Everything reaching here has been through `normalizeStoryPath`
+   * or `storyFilePath`, so one that has not is a bug — and letting it through
+   * would write it somewhere nobody can read, which is the failure this whole
+   * wrapper exists to end.
+   */
+  function storiesScoped(inner: FileOps): FileOps {
+    const within = (wirePath: string): string => {
+      const relative = storiesRelativePath(wirePath);
+      if (relative === null) throw new Error(`mulmoScript: "${wirePath}" is not a stories path — a named root's FileOps takes stories paths only`);
+      return relative;
+    };
+    // Every member is `async` so the refusal arrives as a REJECTED PROMISE,
+    // the way every other FileOps failure does. Throwing synchronously out of
+    // a method the caller only ever awaits would skip its `try`.
+    return {
+      read: async (wirePath) => inner.read(within(wirePath)),
+      readBytes: async (wirePath) => inner.readBytes(within(wirePath)),
+      write: async (wirePath, data) => inner.write(within(wirePath), data),
+      readDir: async (wirePath) => inner.readDir(within(wirePath)),
+      stat: async (wirePath) => inner.stat(within(wirePath)),
+      exists: async (wirePath) => inner.exists(within(wirePath)),
+      unlink: async (wirePath) => inner.unlink(within(wirePath)),
+    };
   }
 
   // mulmocast shells out to ffmpeg for movie / beat rendering. When the
@@ -901,8 +994,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   // ── Upload ops ────────────────────────────────────────────────
 
   async function uploadBeatImageOp(filePath: string, beatIndex: number, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
-    const rootGuard = guardStoryWriteRoot(root);
-    if (rootGuard) return rootGuard;
+    // No root guard: the write is already in the right root. `runStoryOp`
+    // resolves through `resolveStory` — realpath containment, per root — and
+    // hands the executor an ABSOLUTE path, from which `buildContext` derives
+    // its `basedir`. The guard here was added defensively during #3015's
+    // review and refused a write that was never wrong (#3019).
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-beat-image", root }, async ({ context }) => {
       const { imagePath } = getBeatPngImagePath(context, beatIndex);
       // writeFileAtomic creates parent dirs and prevents a half-
@@ -914,8 +1010,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   async function uploadCharacterImageOp(filePath: string, key: string, imageData: string, root?: string): Promise<OpResult<{ image: string }>> {
-    const rootGuard = guardStoryWriteRoot(root);
-    if (rootGuard) return rootGuard;
+    // No root guard: the write is already in the right root. `runStoryOp`
+    // resolves through `resolveStory` — realpath containment, per root — and
+    // hands the executor an ABSOLUTE path, from which `buildContext` derives
+    // its `basedir`. The guard here was added defensively during #3015's
+    // review and refused a write that was never wrong (#3019).
     return runStoryOp<{ image: string }>(filePath, { operation: "upload-character-image", root }, async ({ context }) => {
       const imagePath = getReferenceImagePath(context, key, "png");
       const base64 = stripDataUri(imageData);
@@ -1184,6 +1283,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     guardStoryWirePath,
     guardStoryRootRegistered,
     guardStoryWriteRoot,
+    artifactsForRoot,
     guardStoryGenerationRoot,
     ffmpegGuard,
     runStoryOp,

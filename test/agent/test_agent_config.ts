@@ -23,7 +23,9 @@ import {
   rewriteLocalhostForDocker,
   userServerAllowedToolNames,
   workspaceModuleMounts,
+  type StartShim,
 } from "../../server/agent/config.js";
+import { shimProbeUrl, shimSseUrl } from "../../server/agent/stdioHttpShim.js";
 import type { McpServerSpec } from "../../server/system/config.js";
 
 describe("buildMcpConfig", () => {
@@ -840,6 +842,99 @@ describe("prepareUserServers", () => {
     };
     assert.deepEqual((await prepareUserServers(servers, false, hostWs)).servers, {});
     assert.deepEqual((await prepareUserServers(servers, true, hostWs)).servers, {});
+  });
+
+  // #3018: the host-exec success path had NO coverage — only the drop
+  // paths above were reachable from a test — so the shim's spec was
+  // emitted with the wrong transport for its whole life (#1421 Phase B
+  // through 1.15.0) and nothing went red. The shim is injected here so
+  // these run without spawning supergateway.
+  describe("host-exec shim success path (#3018)", () => {
+    const optedIn: Record<string, McpServerSpec> = {
+      "email-icloud": {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "@codefuturist/email-mcp", "stdio"],
+        hostExecInDocker: true,
+      },
+    };
+    const fakeShim =
+      (url: string): StartShim =>
+      async () => ({ url, close: () => {} });
+
+    it("declares the transport the gateway actually speaks, not http", async () => {
+      // supergateway defaults to the legacy HTTP+SSE transport for
+      // `--stdio`: it serves GET on the stream path and POST on a
+      // separate one. `type: "http"` (Streamable HTTP) makes the CLI
+      // POST `initialize` to the stream path, take a 404, and register
+      // the server with zero tools — the exact #3018 symptom.
+      const { servers: out } = await prepareUserServers(optedIn, true, hostWs, fakeShim("http://127.0.0.1:39100/sse"));
+      assert.deepEqual(out, {
+        "email-icloud": { type: "sse", url: "http://host.docker.internal:39100/sse" },
+      });
+    });
+
+    it("keeps the gateway path and rewrites only the host for the container", async () => {
+      // The sandboxed agent can't reach the host's loopback, and the
+      // path must survive the rewrite or the client hits a 404 route.
+      const { servers: out } = await prepareUserServers(optedIn, true, hostWs, fakeShim("http://127.0.0.1:39137/sse"));
+      const spec = out["email-icloud"];
+      assert.ok(spec && "url" in spec);
+      assert.equal(new URL(spec.url).hostname, "host.docker.internal");
+      assert.equal(new URL(spec.url).pathname, "/sse");
+    });
+
+    it("hands back the shim handle so the caller can tear it down", async () => {
+      // A leaked handle means an orphaned host process holding a port.
+      let closed = false;
+      const { shims } = await prepareUserServers(optedIn, true, hostWs, async () => ({
+        url: "http://127.0.0.1:39100/sse",
+        close: () => {
+          closed = true;
+        },
+      }));
+      assert.equal(shims.length, 1);
+      const [handle] = shims;
+      assert.ok(handle);
+      handle.close();
+      assert.equal(closed, true, "the returned handle must close the gateway it started");
+    });
+
+    it("falls back to dropping the server when the gateway never comes up", async () => {
+      const { servers: out, shims } = await prepareUserServers(optedIn, true, hostWs, async () => null);
+      assert.deepEqual(out, {}, "a half-broken server must not be wired up");
+      assert.equal(shims.length, 0);
+    });
+
+    it("exposes the shimmed server to the tool allowlist", async () => {
+      // The allowlist reads the PREPARED map, and its stdio branch must
+      // not swallow the rewritten entry — otherwise the tools connect
+      // but stay unusable.
+      const { servers: out } = await prepareUserServers(optedIn, true, hostWs, fakeShim("http://127.0.0.1:39100/sse"));
+      assert.deepEqual(userServerAllowedToolNames(out, true), ["mcp__email-icloud"]);
+    });
+  });
+});
+
+describe("stdioHttpShim URLs (#3018)", () => {
+  it("advertises the SSE stream path to the agent", () => {
+    assert.equal(shimSseUrl(39100), "http://127.0.0.1:39100/sse");
+  });
+
+  it("never probes the SSE path", () => {
+    // The gateway keeps ONE MCP Server and connects it per GET of the
+    // stream path; a probe there consumes the only session, so the
+    // agent's connect throws "Already connected to a transport" and
+    // takes the gateway down. Probing the message path answers 400
+    // without touching the Server.
+    assert.notEqual(new URL(shimProbeUrl(39100)).pathname, new URL(shimSseUrl(39100)).pathname);
+    assert.equal(shimProbeUrl(39100), "http://127.0.0.1:39100/message");
+  });
+
+  it("points both URLs at the same gateway", () => {
+    const sse = new URL(shimSseUrl(39100));
+    const probe = new URL(shimProbeUrl(39100));
+    assert.equal(probe.host, sse.host);
   });
 });
 

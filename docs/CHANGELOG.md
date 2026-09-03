@@ -10,6 +10,103 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ---
 
+## [1.15.1] - 2026-09-03
+
+**A stdio MCP server run on the host from inside the Docker sandbox now actually reaches the agent.**
+
+### Fixed
+
+#### A stdio MCP server opted into `hostExecInDocker` never reached the agent (#3018, PR #3036)
+
+The documented opt-in that runs a stdio MCP server on the host while the Docker sandbox is on has
+never worked, for any server, since it shipped in #1421 Phase B (2026-05-18). The shim logged
+`stdio→http shim ready`, `/api/diagnostics/report` listed the server, and the agent got zero
+tools. Two independent defects, either one enough on its own.
+
+**The spec named the wrong transport.** `prepareUserServers` wrote `{ type: "http", url: "…/sse" }`,
+but `supergateway` defaults `--outputTransport` to `sse` for `--stdio` and serves a GET stream at
+`/sse` with POSTed messages at `/message` — there is no `POST /sse`. The CLI treats `type: "http"`
+as Streamable HTTP, so it POSTed `initialize` to the stream path, took a 404, and registered the
+server with no tools.
+
+**The readiness probe consumed the gateway's only session.** `supergateway` keeps a single MCP
+`Server` and calls `server.connect()` on every `GET /sse`; the second connect throws
+`Already connected to a transport` inside an Express handler, which is unhandled and takes the
+gateway down with its stdio child. `probeOnce` opened that stream and never released it, so the
+agent's connect was always the fatal second one. Closing the probe's stream does not help — the
+gateway never calls `server.close()`. Readiness is now proven by `POST /message` without a
+`sessionId`, which answers 400 from a route that never touches the `Server`.
+
+**Why both signals looked healthy.** The `shim ready` log came from a probe that validated the
+**SSE** endpoint while the caller labelled the spec `http` — the probe was quietly proving the
+mismatch. And "MCP servers" in `/api/diagnostics/report` is `Object.keys(loadMcpConfig().mcpServers)`,
+read from `config/mcp.json`: it reports what is **configured**, never what is **connected**. The
+CLI does report `status: "failed"` for the server, but nothing on the host side reads it, so no
+error surfaced.
+
+**Nothing to change in your config.** A `config/mcp.json` entry that was correct before is correct
+now. User config still accepts only `http` and `stdio`; the `sse` spec is produced internally by
+the shim and `isMcpServerSpec` continues to reject it, so the Settings UI gains no new option.
+
+Verified end to end through the real `prepareUserServers` + `startStdioHttpShim` + `claude` CLI
+against `@modelcontextprotocol/server-memory`: `status: "connected"` with all nine tools.
+
+#### `@mulmoclaude/core@4.7.0` — a version-only republish of 4.6.0, no code change
+
+Released 2026-09-03. The 4.6.0 publish had already landed when the release was re-run, and npm
+refuses to republish a version, so the repair is a new number rather than a re-publish of the old
+one (the same reasoning as 4.1.1). **The two are the same build**: the published tarballs are
+identical across all 452 files except the `version` string, and the tree between the tags differs
+by that one line.
+
+Nothing to do if you are already on 4.6.0. No dependency ranges move — every consumer declares a
+`^4.x` caret and converges on 4.7.0 on its own.
+
+#### `@mulmoclaude/core@4.6.0` — a custom view's staging base is decided per SLUG, not per root (#3031, PR #3032; mulmoterminal#1957, mulmoterminal#1955)
+
+Released 2026-09-03. Also shipped unchanged as 4.7.0 (above). `readSourceAwareFile` prepended the `data/skills/<slug>/` staging base for
+every project-scope collection whenever the ROOT had a staging tree, without checking that the
+slug itself was staged — `stagingSkillDir(root, slug)` only answers "does this root stage" and
+then joins the slug.
+
+A staged workspace does not hold only staged collections. It also holds ones imported through the
+discover panel and ones committed directly under `.claude/skills/`, and a leftover
+`data/skills/<slug>/views/*.html` beside one of those won on every read — silently, and against
+the copy the repository actually commits.
+
+The read and the custom-view delete path now share one predicate, the newly exported
+**`stagedSkillDir(workspaceRoot, safeSlug)`**, which returns `<staging>/<slug>` only when that
+slug's own `schema.json` is present. `views.ts` had always made this check in `canonicalBase` /
+`schemaWriteTargets`, and its JSDoc has claimed "Matches `readCustomViewHtml` so reads and deletes
+agree on both layouts" since #1836 — sharing the function is what makes that structurally true
+instead of a convention two files had to remember.
+
+**Unchanged**: properly staged collections (staging still wins), imported collections, roots with
+no staging tree (`skillsStagingDir` → `null`), and `user` / `feed` scope. The behaviour moves only
+for a slug that has a stale staging view but no staged schema of its own — there the committed
+copy now wins.
+
+The evidence check uses `lstat`, so a symlink standing in for `schema.json` is not evidence, and
+it **propagates** anything that is not `ENOENT` / `ENOTDIR`. Collapsing an unreadable staging tree
+into "unstaged" would quietly serve the other base's copy, which is the masking the read loop
+already refuses (Sourcery review on #3032). The delete path inherits the same `lstat` semantics —
+previously `stat`, which followed symlinks.
+
+Why this had to land in core: a host binding cannot express the decision. `skillsStagingDir` is
+`(workspaceRoot: string) => string | null` and never sees the slug, so MulmoTerminal could fix
+which ROOTS stage (mulmoterminal#1955) but not which SLUGS are staged. Fixing it here lands for
+both hosts at once.
+
+**No dependency ranges were swept.** Every consumer declares a `^4.x` caret, which floats across
+minors, so they resolve 4.6.0 on their own; nothing in this tree imports `stagedSkillDir` from the
+published package, so the sweep would be tidiness rather than delivery (the same reasoning as
+4.1.1 / 4.3.0). Also refreshed in this window: `zod` `^4.5.2` → `^4.5.4`, plus `@types/node` and
+`tsx` on the dev side (PR #3030).
+
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.7.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+
+---
+
 ## [1.15.0] - 2026-08-30
 
 **TeX math in the markdown preview, and icons that no longer overlap their neighbour.**
@@ -126,7 +223,7 @@ the baseline" where it now means "as well as". Both consumers here pass two argu
 unaffected, but the rename is a source break for anyone who read the published type. **2.1.0**
 follows with the narrowed inline-`$` rule described above.
 
-Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.5.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.5.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.4.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.7.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.5.2`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 
