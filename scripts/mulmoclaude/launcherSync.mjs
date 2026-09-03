@@ -110,6 +110,14 @@ function parseLowerBound(range) {
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
+// The version a range pins to, comparator removed and nothing else
+// normalised — `^4.8.0-beta.1` → `4.8.0-beta.1`.
+function stripComparator(range) {
+  return String(range)
+    .trim()
+    .replace(/^[\^~>=]*\s*/, "");
+}
+
 function parseVersion(version) {
   if (typeof version !== "string") return null;
   const match = version.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+][\w.]*)?$/);
@@ -168,11 +176,13 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
   if (!lower || !source) {
     return { kind: "skipped", message: `${relPath}: ${field}."${depName}"="${range}" unparseable — cannot verify vs workspace ${workspaceVersion}` };
   }
-  // Compare parsed components on BOTH sides, exactly as invariant 4 does.
-  // `parseLowerBound` drops prerelease/build metadata, so comparing it to the
-  // raw version string reports a correctly-swept prerelease (workspace
-  // `4.8.0-beta.1` vs range `^4.8.0-beta.1`) as drift and blocks the release.
-  if (lower.every((part, index) => part === source[index])) return null;
+  // Compare the FULL lower bound, prerelease and build metadata included —
+  // only the comparator is stripped. Comparing parsed numeric triples instead
+  // is wrong in both directions: against the raw version string a correctly
+  // swept `^4.8.0-beta.1` reads as drift and blocks its own release commit,
+  // and against another triple `^4.8.0-beta.1` passes for a workspace already
+  // at `4.8.0-beta.2`, which is the stale range this invariant exists to find.
+  if (stripComparator(range) === workspaceVersion.trim()) return null;
   return {
     kind: "consumer-lockstep",
     message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,

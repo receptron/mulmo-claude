@@ -444,6 +444,30 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     }
   });
 
+  it("flags a DIFFERENT prerelease with the same numeric tuple", async () => {
+    // The trap in the first attempt at this fix: comparing numeric triples
+    // makes `^4.8.0-beta.1` look synchronized with a workspace already at
+    // `4.8.0-beta.2` — precisely the stale lower bound this invariant exists
+    // to catch, waved through.
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: {} },
+      workspaces: [
+        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.2" } },
+        {
+          dir: "packages/plugins/foo-plugin",
+          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.8.0-beta.1" } },
+        },
+      ],
+    });
+    try {
+      const findings = await sync.auditLauncherSync({ root });
+      assert.equal(findings.filter((finding) => finding.kind === "consumer-lockstep").length, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("still flags a prerelease workspace the consumer has not caught up with", async () => {
     // The leniency above must not swallow real drift: only the numeric
     // components are compared, so 4.7.0 vs 4.8.0-beta.1 is still a finding.
