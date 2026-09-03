@@ -82,7 +82,12 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
       } catch {
         continue;
       }
-      if (typeof pkg.name !== "string" || typeof pkg.version !== "string") continue;
+      // A manifest with no name cannot be referenced, so it is genuinely not a
+      // workspace. A BAD VERSION is different: dropping it here removed every
+      // consumer edge pointing at it from the audit, so a workspace with
+      // `version: 47` silently exempted all of its consumers. Keep it and let
+      // the invariants report it.
+      if (typeof pkg.name !== "string") continue;
       registry.set(pkg.name, {
         name: pkg.name,
         version: pkg.version,
@@ -101,7 +106,17 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
 // `4.8.0-beta.2+build.9` failed to parse — and an unparseable version yields a
 // `skipped` finding, which `main()` excludes from failure. A stale range
 // against such a version therefore walked straight through the gate.
-const SEMVER_CORE = String.raw`(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?(?:\+[\w.-]+)?`;
+// SemVer 2.0.0, spelled out rather than approximated. `\d+` and `[\w.-]`
+// were close enough to look right and wrong where it counts: they accept
+// `04.7.0`, `4.7.0-01` and `4.7.0-beta_1`, all of which npm rejects — so a
+// declaration npm cannot resolve compared equal to its workspace and the
+// gate reported nothing. Numeric identifiers carry no leading zero;
+// prerelease identifiers are alphanumeric-or-hyphen (no `_`); build
+// metadata is the same set but may keep leading zeros.
+const NUM_ID = String.raw`0|[1-9]\d*`;
+const PRE_ID = String.raw`(?:${NUM_ID}|\d*[a-zA-Z-][0-9a-zA-Z-]*)`;
+const BUILD_ID = String.raw`[0-9a-zA-Z-]+`;
+const SEMVER_CORE = String.raw`(${NUM_ID})\.(${NUM_ID})\.(${NUM_ID})(?:-${PRE_ID}(?:\.${PRE_ID})*)?(?:\+${BUILD_ID}(?:\.${BUILD_ID})*)?`;
 const SEMVER_RE = new RegExp(`^${SEMVER_CORE}$`);
 // Only the comparators `satisfies()` below can actually evaluate. The old
 // `[\^~>=]*` accepted any repetition or mixture, so `====4.7.0` and `>4.7.0`

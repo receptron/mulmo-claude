@@ -534,6 +534,31 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1);
   });
 
+  it("rejects versions npm rejects, however plausible they look", async () => {
+    // `\d+` and `[\w.-]` were close enough to look right: they accept a
+    // leading zero, a leading-zero prerelease identifier, and `_` — none of
+    // which npm resolves. Each one used to compare equal to its own consumer
+    // range and produce no finding at all.
+    for (const version of ["04.7.0", "4.7.0-01", "4.7.0-beta_1"]) {
+      const findings = await auditConsumerPair(version, `^${version}`);
+      assert.notDeepEqual(findings, [], `${version} is not valid SemVer and must not pass as in sync`);
+    }
+  });
+
+  it("still accepts every SemVer form that IS valid", async () => {
+    for (const version of ["4.7.0", "4.7.0-beta.1", "4.8.0-beta.2+build.9", "4.7.0+01.2"]) {
+      assert.deepEqual(await auditConsumerPair(version, `^${version}`), [], `${version} is valid SemVer`);
+    }
+  });
+
+  it("fails a workspace whose version is not a string at all", async () => {
+    // `loadWorkspacePackages` used to drop such a manifest, which removed
+    // every consumer edge pointing at it from the audit — a stricter failure
+    // than `skipped`, and completely silent.
+    const findings = await auditConsumerPair(47 as unknown as string, "^4.6.0");
+    assert.equal(findings.filter((finding) => finding.kind === "invalid-workspace-version").length, 1);
+  });
+
   it("fails a workspace whose OWN version is not SemVer", async () => {
     // One malformed version in a workspace's package.json would otherwise
     // disable this invariant for every consumer of that workspace at once —
