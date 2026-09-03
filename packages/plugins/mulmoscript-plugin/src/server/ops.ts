@@ -374,6 +374,16 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     } catch {
       return opNotFound(`File not found: ${filePath}`);
     }
+    // The extension is re-checked on the RESOLVED target, not just the
+    // spelling that arrived: a symlink named `deck.json` may point at any
+    // regular file, and the download routes stream `absolutePath` straight to
+    // the client — so checking only the link's own name would let `deck.json`
+    // → `/etc/passwd` through the very gate that exists to stop it
+    // (CodeRabbit CWE-59 on #3042). Judging the link by what it points at is
+    // the same rule the regular-file check above already applies.
+    if (!isAbsoluteStoryPath(target, STORY_TARGET_EXTENSIONS)) {
+      return opBadRequest("Invalid filePath");
+    }
     return { ok: true, absolutePath: target };
   }
 

@@ -456,9 +456,11 @@ describe("resolveStory — the absolute form", () => {
 
   it("refuses traversal and unknown extensions", () => {
     const { ops, outside } = makeOpsOutside();
-    // Spelled raw, not through path.join: joining would normalise the `..`
-    // away and test nothing — the lexical guard is what must reject it.
-    for (const spelling of [`${outside}/../x.json`, path.join(outside, "notes.md"), path.join(outside, "script.txt")]) {
+    // `path.format` with a `..`-bearing base, not `path.join`: joining would
+    // normalise the `..` away and test nothing — the lexical guard is what
+    // must reject it.
+    const traversal = path.format({ dir: outside, base: path.join("..", "x.json") });
+    for (const spelling of [traversal, path.join(outside, "notes.md"), path.join(outside, "script.txt")]) {
       const resolved = ops.resolveStory(spelling);
       assert.ok(!resolved.ok, `expected ${spelling} to be refused`);
       assert.equal(resolved.code, "bad_request");
@@ -487,6 +489,21 @@ describe("resolveStory — the absolute form", () => {
     assert.ok(!resolved.ok);
     assert.equal(resolved.code, "bad_request");
     assert.equal(resolved.error, "Invalid filePath");
+  });
+
+  it("refuses a supported-suffix symlink pointing at an unsupported file", () => {
+    // `realpathSync` happily resolves `deck.json` to anything. The download
+    // routes stream what comes back, so the resolved TARGET has to carry a
+    // known extension too — otherwise the link's name is the only check and
+    // `deck.json` -> `/etc/passwd` would be served (CodeRabbit CWE-59).
+    const { ops, outside } = makeOpsOutside();
+    const secret = path.join(outside, "secret.env");
+    writeFileSync(secret, "TOKEN=1");
+    const link = path.join(outside, "innocent.json");
+    symlinkSync(secret, link);
+    const resolved = ops.resolveStory(link);
+    assert.ok(!resolved.ok);
+    assert.equal(resolved.code, "bad_request");
   });
 
   it("is answered before the root checks — an unregistered root cannot refuse it", () => {
