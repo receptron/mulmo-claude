@@ -1,6 +1,6 @@
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import type { FileOps } from "gui-chat-protocol";
@@ -395,5 +395,127 @@ describe("resolveStory — wire path spellings", () => {
       assert.ok(!resolved.ok, `expected ${spelling} to be rejected`);
       assert.equal(resolved.code, "bad_request");
     }
+  });
+});
+
+describe("resolveStory — the absolute form", () => {
+  const dirs: string[] = [];
+  after(() => dirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  /** Ops whose stories dir does NOT exist and is never created: an absolute
+   *  path is relative to nothing, so it must resolve without one. */
+  function makeOpsOutside(): { ops: ReturnType<typeof createMulmoScriptServerOps>; outside: string } {
+    const outside = mkdtempSync(path.join(tmpdir(), "mulmoscript-outside-"));
+    dirs.push(outside);
+    return {
+      ops: createMulmoScriptServerOps({
+        storiesDir: path.join(outside, "no-such-workspace", "artifacts", "stories"),
+        artifacts: stubFileOps,
+        writeFileAtomic: async () => {},
+      }),
+      outside,
+    };
+  }
+
+  it("resolves a real .json file outside the stories dir", () => {
+    const { ops, outside } = makeOpsOutside();
+    const deck = path.join(outside, "keynote.json");
+    writeFileSync(deck, "{}");
+    const resolved = ops.resolveStory(deck);
+    assert.ok(resolved.ok);
+    assert.equal(resolved.absolutePath, realpathSync(deck));
+  });
+
+  it("resolves the media extensions the package mints wire refs in", () => {
+    const { ops, outside } = makeOpsOutside();
+    for (const name of ["out.mp4", "clip.mov", "handout.pdf"]) {
+      const file = path.join(outside, name);
+      writeFileSync(file, "x");
+      assert.ok(ops.resolveStory(file).ok, `expected ${name} to resolve`);
+    }
+  });
+
+  it("404s a missing absolute path", () => {
+    const { ops, outside } = makeOpsOutside();
+    const resolved = ops.resolveStory(path.join(outside, "gone.json"));
+    assert.ok(!resolved.ok);
+    assert.equal(resolved.code, "not_found");
+  });
+
+  it("refuses a directory that merely ends in .json", () => {
+    const { ops, outside } = makeOpsOutside();
+    const decoy = path.join(outside, "deck.json");
+    mkdirSync(decoy);
+    const resolved = ops.resolveStory(decoy);
+    assert.ok(!resolved.ok);
+    assert.equal(resolved.code, "bad_request");
+  });
+
+  it("refuses traversal and unknown extensions", () => {
+    const { ops, outside } = makeOpsOutside();
+    // Spelled raw, not through path.join: joining would normalise the `..`
+    // away and test nothing — the lexical guard is what must reject it.
+    for (const spelling of [`${outside}/../x.json`, path.join(outside, "notes.md"), path.join(outside, "script.txt")]) {
+      const resolved = ops.resolveStory(spelling);
+      assert.ok(!resolved.ok, `expected ${spelling} to be refused`);
+      assert.equal(resolved.code, "bad_request");
+    }
+  });
+
+  it("judges a symlink by what it points at", () => {
+    const { ops, outside } = makeOpsOutside();
+    const real = path.join(outside, "real.json");
+    writeFileSync(real, "{}");
+    const link = path.join(outside, "link.json");
+    symlinkSync(real, link);
+    const resolved = ops.resolveStory(link);
+    assert.ok(resolved.ok);
+    assert.equal(resolved.absolutePath, realpathSync(real));
+  });
+
+  it("is answered before the root checks — an unregistered root cannot refuse it", () => {
+    // Absolute paths carry no root, so a caller that passes one (a stale card,
+    // a host typo) must not turn a perfectly valid absolute path into
+    // "Unknown stories root".
+    const { ops, outside } = makeOpsOutside();
+    const deck = path.join(outside, "rooted.json");
+    writeFileSync(deck, "{}");
+    assert.ok(ops.resolveStory(deck, "never-registered").ok);
+  });
+});
+
+describe("outputRef — where a generated artifact's wire ref points", () => {
+  const dirs: string[] = [];
+  after(() => dirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  function makeRealOps(): { ops: ReturnType<typeof createMulmoScriptServerOps>; storiesDir: string } {
+    const workspace = mkdtempSync(path.join(tmpdir(), "mulmoscript-outputref-"));
+    dirs.push(workspace);
+    const storiesDir = path.join(workspace, "artifacts", "stories");
+    mkdirSync(storiesDir, { recursive: true });
+    return { ops: createMulmoScriptServerOps({ storiesDir, artifacts: stubFileOps, writeFileAtomic: async () => {} }), storiesDir };
+  }
+
+  it("keeps minting stories/<rel> refs for a relative script", () => {
+    const { ops, storiesDir } = makeRealOps();
+    // Through realpath: on macOS the temp dir is reached via /var, a symlink
+    // to /private/var, and mulmocast hands back the resolved form.
+    const output = path.join(realpathSync(storiesDir), "output", "foo.mp4");
+    assert.equal(ops.outputRef(output, "stories/foo.json"), "stories/output/foo.mp4");
+  });
+
+  it("returns the absolute output path for an absolute script", () => {
+    // mulmocast derives output paths from the script's own directory, so an
+    // absolute script's artifacts have no stories-relative spelling. Handing
+    // back the absolute path is what makes them addressable at all — and
+    // resolveStory reads that form back unchanged.
+    const { ops } = makeRealOps();
+    const output = "/Users/me/decks/output/keynote.mp4";
+    assert.equal(ops.outputRef(output, "/Users/me/decks/keynote.json"), output);
+  });
+
+  it("still refuses an output outside the stories root for a relative script", () => {
+    const { ops } = makeRealOps();
+    assert.equal(ops.outputRef("/elsewhere/foo.mp4", "stories/foo.json"), null);
   });
 });

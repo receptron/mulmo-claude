@@ -95,7 +95,13 @@ function guardSuppliedRoot(root: unknown): { ok: false; code: string; error: str
 }
 
 export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): MulmoScriptDispatchHandler {
-  const executeContext: MulmoScriptExecuteContext = { files: { artifacts: ops.backend.artifacts } };
+  // `byPath` rides along when the host supplies it, so the dispatch route
+  // accepts the absolute `filePath` form on exactly the same terms as the
+  // host's REST route — one tool call must not mean two things depending on
+  // whether the View or the agent made it.
+  const executeContext: MulmoScriptExecuteContext = {
+    files: { artifacts: ops.backend.artifacts, ...(ops.backend.byPath ? { byPath: ops.backend.byPath } : {}) },
+  };
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {
     // Writes stay in the default root until step 2 gives the executors a

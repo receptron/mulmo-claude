@@ -11,6 +11,8 @@
 
 import path from "path";
 import { createMulmoScriptServerOps, createMulmoScriptDispatchHandler, GENERATION_EVENT } from "@mulmoclaude/mulmoscript-plugin/server";
+import { STORY_SCRIPT_EXTENSIONS } from "@mulmoclaude/mulmoscript-plugin";
+import { makeByPathFileOps } from "../utils/files/by-path.js";
 import { WORKSPACE_PATHS } from "../workspace/paths.js";
 import { writeFileAtomic } from "../utils/files/atomic.js";
 import { depStatus } from "../system/optionalDeps.js";
@@ -30,6 +32,9 @@ let pubsubInstance: IPubSub | null = null;
 export const mulmoScriptOps = createMulmoScriptServerOps({
   storiesDir: path.resolve(WORKSPACE_PATHS.stories),
   artifacts: makeArtifactsFileOps(),
+  // Lets `filePath` name a .json script outside `artifacts/stories/` — see
+  // the `byPath` doc on MulmoScriptServerBackend.
+  byPath: makeByPathFileOps(STORY_SCRIPT_EXTENSIONS),
   writeFileAtomic: async (absolutePath, data) => {
     await writeFileAtomic(absolutePath, typeof data === "string" ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength));
   },

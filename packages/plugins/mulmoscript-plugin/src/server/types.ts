@@ -78,6 +78,18 @@ export interface MulmoScriptServerBackend {
   /** Shared artifacts FileOps (rooted at `<workspace>/artifacts`) for the
    *  save / reopen / update dispatch kinds (phase-1 core executes). */
   artifacts: FileOps;
+  /**
+   * FileOps over caller-supplied ABSOLUTE paths — what makes `filePath` able
+   * to name a script outside `artifacts/stories/`, the same capability
+   * presentDocument / presentHtml take for their `path` argument
+   * (`@mulmoclaude/core/files`' byPath ops). A RELATIVE `filePath` never
+   * reaches it.
+   *
+   * Optional so a host that has not opted in keeps the stories-only behaviour
+   * byte for byte: without it the core's `locate` refuses an absolute path
+   * rather than resolving it somewhere else.
+   */
+  byPath?: FileOps;
   /** Atomic file write (tmp alongside destination + rename; parent dirs
    *  created). Hosts inject their hardened implementation. */
   writeFileAtomic: (absolutePath: string, data: string | Uint8Array) => Promise<void>;

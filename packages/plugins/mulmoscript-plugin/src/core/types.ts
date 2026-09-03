@@ -24,10 +24,21 @@ export interface MulmoScriptData {
 }
 
 /** Host capabilities the phase-1 core needs, delivered through the GENERIC
- *  gui-chat-protocol runtime — only `files.artifacts` (the shared,
- *  user-browsable output area rooted at `<workspace>/artifacts`). Save /
- *  reopen / update logic lives entirely in this package; heavy render
- *  backends (mulmocast, ffmpeg) stay host-side until phase 3. */
+ *  gui-chat-protocol runtime — `files.artifacts` (the shared, user-browsable
+ *  output area rooted at `<workspace>/artifacts`) and the optional
+ *  `files.byPath` for the absolute `filePath` form. Save / reopen / update
+ *  logic lives entirely in this package; heavy render backends (mulmocast,
+ *  ffmpeg) stay host-side until phase 3. */
 export interface MulmoScriptExecuteContext {
-  files: { artifacts: FileOps };
+  files: {
+    /** Rooted at `<workspace>/artifacts` — where NEW scripts are written, and
+     *  where every RELATIVE `filePath` resolves, exactly as before. */
+    artifacts: FileOps;
+    /** Reads / writes a script the caller named by ABSOLUTE path. Supplied by
+     *  hosts that let presentMulmoScript open a deck outside
+     *  `artifacts/stories/`; without it, `filePath` keeps its original
+     *  stories-only meaning, so an older host degrades to the previous
+     *  behaviour instead of mis-resolving. */
+    byPath?: FileOps;
+  };
 }

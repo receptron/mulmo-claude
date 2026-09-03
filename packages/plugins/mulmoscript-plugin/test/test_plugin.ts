@@ -289,3 +289,108 @@ describe("executeMulmoScriptSave — replacing one beat", () => {
     assert.equal(JSON.stringify(beatsIn(store, filePath)), before);
   });
 });
+
+// ── The absolute `filePath` form ─────────────────────────────────────────────
+//
+// A relative path must keep resolving through `files.artifacts` under the
+// stories dir, byte for byte as before; an absolute one goes to the host's
+// `files.byPath` and is its own wire form.
+
+/** `makeFakeContext` plus a second, independent store reached through
+ *  `files.byPath` — so a test can prove WHICH FileOps was used, not merely
+ *  that the call succeeded. */
+function makeByPathContext(
+  artifactsSeed: Record<string, string> = {},
+  byPathSeed: Record<string, string> = {},
+): { context: MulmoScriptExecuteContext; store: Map<string, string>; byPathStore: Map<string, string> } {
+  const { context, store } = makeFakeContext(artifactsSeed);
+  const byPathStore = new Map(Object.entries(byPathSeed));
+  const byPath: FileOps = {
+    read: async (rel) => {
+      const hit = byPathStore.get(rel);
+      if (hit === undefined) throw new Error(`ENOENT: ${rel}`);
+      return hit;
+    },
+    readBytes: async () => new Uint8Array(),
+    write: async (rel, content) => {
+      byPathStore.set(rel, typeof content === "string" ? content : Buffer.from(content).toString("utf-8"));
+    },
+    readDir: async () => [],
+    stat: async () => ({ mtimeMs: 0, size: 0 }),
+    exists: async (rel) => byPathStore.has(rel),
+    unlink: async (rel) => {
+      byPathStore.delete(rel);
+    },
+  };
+  return { context: { files: { artifacts: context.files.artifacts, byPath } }, store, byPathStore };
+}
+
+const ABS = "/Users/me/decks/keynote.json";
+
+describe("executeMulmoScriptSave — absolute filePath", () => {
+  it("reads through files.byPath and echoes the absolute path back as the wire form", async () => {
+    const { context } = makeByPathContext({}, { [ABS]: JSON.stringify(VALID_SCRIPT) });
+    const out = await executeMulmoScriptSave(context, { filePath: ABS }, NOW);
+    assert.equal(out.ok, true);
+    assert.equal(out.ok && out.filePath, ABS);
+  });
+
+  it("never consults files.artifacts for an absolute path", async () => {
+    // Same basename seeded in the stories dir. Taking it from there would be
+    // the silent substitution every path rule in this package exists to refuse.
+    const { context } = makeByPathContext(
+      { "stories/keynote.json": JSON.stringify({ ...VALID_SCRIPT, title: "WRONG" }) },
+      { [ABS]: JSON.stringify(VALID_SCRIPT) },
+    );
+    const out = await executeMulmoScriptSave(context, { filePath: ABS }, NOW);
+    assert.equal(out.ok && out.script.title, "Test Story");
+  });
+
+  it("reports not_found when the absolute path holds nothing", async () => {
+    const { context } = makeByPathContext();
+    const out = await executeMulmoScriptSave(context, { filePath: ABS }, NOW);
+    assert.deepEqual(out, { ok: false, code: "not_found", error: `File not found: ${ABS}` });
+  });
+
+  it("is refused by a host that supplies no files.byPath — the pre-existing behaviour", async () => {
+    const { context } = makeFakeContext();
+    const out = await executeMulmoScriptSave(context, { filePath: ABS }, NOW);
+    assert.deepEqual(out, { ok: false, code: "bad_request", error: "Invalid filePath" });
+  });
+
+  it("refuses a traversal segment even with files.byPath present", async () => {
+    const { context } = makeByPathContext();
+    const out = await executeMulmoScriptSave(context, { filePath: "/Users/me/../etc/deck.json" }, NOW);
+    assert.deepEqual(out, { ok: false, code: "bad_request", error: "Invalid filePath" });
+  });
+
+  it("leaves a RELATIVE filePath on the artifacts FileOps", async () => {
+    const { context, byPathStore } = makeByPathContext({ "stories/keynote.json": JSON.stringify(VALID_SCRIPT) });
+    const out = await executeMulmoScriptSave(context, { filePath: "stories/keynote.json" }, NOW);
+    assert.equal(out.ok && out.filePath, "stories/keynote.json");
+    assert.equal(byPathStore.size, 0, "a relative path must never reach files.byPath");
+  });
+});
+
+describe("update endpoints — absolute filePath", () => {
+  it("executeUpdateBeat writes back through files.byPath", async () => {
+    const { context, byPathStore, store } = makeByPathContext({}, { [ABS]: JSON.stringify(VALID_SCRIPT) });
+    const out = await executeUpdateBeat(context, { filePath: ABS, beatIndex: 0, beat: { ...VALID_BEAT, text: "Edited." } });
+    assert.deepEqual(out, { ok: true });
+    assert.match(byPathStore.get(ABS) ?? "", /Edited\./);
+    assert.equal(store.size, 0, "the edit must not land in the stories dir");
+  });
+
+  it("executeUpdateScript writes back through files.byPath", async () => {
+    const { context, byPathStore } = makeByPathContext({}, { [ABS]: JSON.stringify(VALID_SCRIPT) });
+    const out = await executeUpdateScript(context, { filePath: ABS, script: { ...VALID_SCRIPT, title: "Renamed" } });
+    assert.deepEqual(out, { ok: true });
+    assert.match(byPathStore.get(ABS) ?? "", /"Renamed"/);
+  });
+
+  it("executeUpdateBeat on an absolute path is refused without files.byPath", async () => {
+    const { context } = makeFakeContext();
+    const out = await executeUpdateBeat(context, { filePath: ABS, beatIndex: 0, beat: VALID_BEAT });
+    assert.deepEqual(out, { ok: false, code: "bad_request", error: "Invalid filePath" });
+  });
+});

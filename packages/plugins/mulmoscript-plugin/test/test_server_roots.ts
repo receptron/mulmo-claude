@@ -310,6 +310,7 @@ describe("the whole ops surface is classified for named roots", () => {
    */
   const GUARDED_ELSEWHERE = [
     "toStoryRef",
+    "outputRef",
     "resolveStory",
     "guardStoryWirePath",
     "guardStoryRootRegistered",

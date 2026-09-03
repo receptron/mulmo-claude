@@ -10,5 +10,5 @@ export {
   type SaveMulmoScriptOutcome,
   type UpdateMulmoScriptOutcome,
 } from "./plugin";
-export { normalizeStoryPath, slugify, storyFilePath } from "./paths";
+export { isAbsoluteStoryPath, normalizeStoryPath, slugify, storyFilePath, STORY_SCRIPT_EXTENSIONS, STORY_TARGET_EXTENSIONS } from "./paths";
 export { validateUpdateBeatBody, validateUpdateScriptBody, type ValidationResult } from "./validate";
