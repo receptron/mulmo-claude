@@ -46,7 +46,7 @@ slug を受け取らず、`<staging>/<slug>` を join するのは core 内部�
 export async function stagedSkillDir(workspaceRoot: string, safeSlug: string): Promise<string | null> {
   const staging = stagingSkillDir(workspaceRoot, safeSlug);
   if (staging === null) return null;
-  return (await isRegularFile(path.join(staging, SCHEMA_FILE))) ? staging : null;
+  return (await isStagedSchema(path.join(staging, SCHEMA_FILE))) ? staging : null;
 }
 ```
 
@@ -57,14 +57,23 @@ export async function stagedSkillDir(workspaceRoot: string, safeSlug: string): P
 証拠が `schema.json` なのは、それが staged なコレクションが実際に持つ形だから。
 `putSchema` が書き、`canonicalBase` が既に見ているファイル。
 
-### D2: 証拠の判定は `isRegularFile`（`io.ts` の共有ヘルパー）にする
+### D2: 証拠の判定は `lstat` + 「missing-here だけ false」にする（`isStagedSchema`）
 
-`views.ts` の private `fileExists` は `stat` —— symlink を辿る。`isRegularFile` は `lstat` で、
-symlink を「通常ファイルではない」と答える。このリポジトリが record 読み取りで採っている
-symlink 防御と同じ向き。
+2 つの性質が要る。
 
-**削除側にとっては挙動の変更**（staging の `schema.json` が symlink のとき、staging を
-canonical と見なさなくなる）。方向としては安全側だが、PR で明示する。
+**(a) regular file であること。** `views.ts` の private `fileExists` は `stat` —— symlink を辿る。
+`lstat` にして、symlink が schema.json の代わりに立っているものを証拠にしない。このリポジトリが
+record 読み取りで採っている symlink 防御と同じ向き。**削除側にとっては挙動の変更**（staging の
+`schema.json` が symlink のとき staging を canonical と見なさなくなる）。安全側だが PR で明示する。
+
+**(b) 「無い」と「読めない」を混ぜないこと。** `io.ts` の `isRegularFile` は `lstat` の失敗を
+すべて `false` に潰すので使えない —— EACCES を「staged ではない」と読み替え、黙って別の base の
+コピーを返してしまう。これは `readSourceAwareFile` の read loop が #1836 のレビューを受けて
+明示的に禁じている masking そのもの（Sourcery review on #3032）。
+
+なので専用の `isStagedSchema` を置く: `lstat` + `ENOENT`/`ENOTDIR` のみ `false`、それ以外は
+**再送出**。「どのコードが not-here か」は read loop と同じ集合なので `isMissingHere` に括り出して
+共有し、2 か所に書き写さない。
 
 `fileExists` はこれで使われなくなるので削除する。
 
@@ -96,7 +105,8 @@ canonical と見なさなくなる）。方向としては安全側だが、PR �
 
 | 変更 | 場所 |
 |---|---|
-| `stagedSkillDir` を足し、`readSourceAwareFile` を通す | `packages/core/src/collection/server/skillAssets.ts` |
+| `stagedSkillDir` / `isStagedSchema` / `isMissingHere` を足し、read loop を `readFromBases` に抽出 | `packages/core/src/collection/server/skillAssets.ts` |
 | `canonicalBase` / `schemaWriteTargets` をそれに通し、`fileExists` を削除 | `packages/core/src/collection/server/views.ts` |
 | fixture を実物に合わせ、#3031 のケースを追加 | `test/workspace/collections/test_io.ts` |
-| per-slug の証拠を core のテストでも留める | `packages/core/test/collection/test_stagedPerSlug.ts`（新規） |
+| per-slug の証拠と error propagation を core のテストで留める | `packages/core/test/collection/test_stagedPerSlug.ts`（新規） |
+| `stagedSkillDir` を catalog に追記し、`stagingSkillDir` の行から誘導 | `docs/shared-utils.md` |
