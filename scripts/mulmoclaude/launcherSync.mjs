@@ -164,6 +164,23 @@ const VERSIONLESS_PROTOCOLS = new Set([
   "bitbucket",
 ]);
 
+// `workspace:` is the one protocol that MAY carry a range of its own.
+// `workspace:*`, `workspace:^` and `workspace:~` are the versionless forms —
+// the package manager substitutes the local version at publish time. But
+// `workspace:^4.6.0` states a lower bound like any other range, and skipping
+// it let a stale internal dependency through. Unwrap the prefix and let the
+// normal path judge what follows.
+const WORKSPACE_PREFIX = "workspace:";
+const VERSIONLESS_WORKSPACE_FORMS = new Set(["*", "^", "~"]);
+
+function unwrapWorkspaceProtocol(range) {
+  if (typeof range !== "string") return range;
+  const trimmed = range.trim();
+  if (!trimmed.toLowerCase().startsWith(WORKSPACE_PREFIX)) return trimmed;
+  const inner = trimmed.slice(WORKSPACE_PREFIX.length);
+  return VERSIONLESS_WORKSPACE_FORMS.has(inner) ? "*" : inner;
+}
+
 function isVersionlessSpecifier(range) {
   if (typeof range !== "string") return false;
   const trimmed = range.trim();
@@ -255,13 +272,14 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
       message: `${relPath}: ${field}."${depName}" points at workspace ${depName}, whose own version "${workspaceVersion}" is not valid SemVer — no consumer of it can be verified`,
     };
   }
-  if (isVersionlessSpecifier(range)) {
+  const specifier = unwrapWorkspaceProtocol(range);
+  if (isVersionlessSpecifier(specifier)) {
     return {
       kind: "skipped",
       message: `${relPath}: ${field}."${depName}"="${range}" resolves by a route that names no version — nothing to compare against workspace ${workspaceVersion}`,
     };
   }
-  const lower = parseLowerBound(range);
+  const lower = parseLowerBound(specifier);
   if (!lower) {
     return {
       kind: "unsupported-range",
@@ -273,7 +291,7 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
   // `^4.8.0-beta.1` reads as drift and blocks its own release commit, and
   // against another triple `^4.8.0-beta.1` passes for a workspace already at
   // `4.8.0-beta.2`, the stale range this invariant exists to find.
-  if (comparableVersion(range) === comparableVersion(workspaceVersion)) return null;
+  if (comparableVersion(specifier) === comparableVersion(workspaceVersion)) return null;
   return {
     kind: "consumer-lockstep",
     message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,

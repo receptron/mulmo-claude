@@ -537,6 +537,30 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     }
   });
 
+  it("evaluates a version-bearing workspace: range instead of skipping it", async () => {
+    // `workspace:` is not automatically versionless — `workspace:^4.6.0`
+    // states a lower bound like any other range, and skipping every
+    // `workspace:` value let a stale internal dependency through.
+    for (const range of ["workspace:^4.6.0", "workspace:~4.6.0", "workspace:4.6.0"]) {
+      const findings = await auditConsumerPair("4.7.0", range);
+      assert.equal(consumerLockstepCount(findings), 1, `${range} is stale and must be reported`);
+      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, `${range} must not skip`);
+    }
+  });
+
+  it("still skips the workspace: forms that genuinely carry no version", async () => {
+    // The package manager substitutes the local version at publish time.
+    for (const range of ["workspace:*", "workspace:^", "workspace:~"]) {
+      const findings = await auditConsumerPair("4.7.0", range);
+      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1, `${range} should skip`);
+      assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0, `${range} should not fail`);
+    }
+  });
+
+  it("accepts a workspace: range that is in step", async () => {
+    assert.deepEqual(await auditConsumerPair("4.7.0", "workspace:^4.7.0"), []);
+  });
+
   it("fails a non-string dependency value", async () => {
     const findings = await auditConsumerPair("4.7.0", null as unknown as string);
     assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1);
