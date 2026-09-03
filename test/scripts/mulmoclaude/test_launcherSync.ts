@@ -484,6 +484,29 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     assert.equal(consumerLockstepCount(await auditConsumerPair("4.8.0-beta.1", "^4.7.0")), 1);
   });
 
+  it("fails a malformed comparator instead of reading a lower bound out of it", async () => {
+    // `====4.7.0` is not a range npm accepts, but `[\^~>=]*` matched the
+    // prefix and the numeric part compared equal to the workspace — so the
+    // gate reported nothing at all. Skipping would be no better: `main()`
+    // drops skipped findings from the failure count.
+    const findings = await auditConsumerPair("4.7.0", "====4.7.0");
+    assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1);
+    assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, "a malformed range must fail, not skip");
+  });
+
+  it("fails a comparator that excludes the version it names", async () => {
+    // `>4.7.0` does not admit 4.7.0, so a consumer declaring it against a
+    // workspace at 4.7.0 is broken — yet it used to read as lower bound 4.7.0
+    // and pass.
+    assert.equal((await auditConsumerPair("4.7.0", ">4.7.0")).filter((finding) => finding.kind === "unsupported-range").length, 1);
+  });
+
+  it("accepts the comparators the gate can evaluate", async () => {
+    for (const range of ["4.7.0", "^4.7.0", "~4.7.0", ">=4.7.0"]) {
+      assert.deepEqual(await auditConsumerPair("4.7.0", range), [], `${range} must be evaluable`);
+    }
+  });
+
   it("surfaces an unparseable consumer range as skipped, never as a failure", async () => {
     const root = makeFakeRepo({
       root: { name: "monorepo", dependencies: {} },

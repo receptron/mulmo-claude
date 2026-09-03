@@ -12,7 +12,14 @@ export interface WorkspacePackage {
 }
 
 export type FindingKind =
-  "root-launcher-mismatch" | "workspace-source-drift" | "workspace-lockstep" | "peer-dep-violation" | "peer-dep-lockstep" | "consumer-lockstep" | "skipped";
+  | "root-launcher-mismatch"
+  | "workspace-source-drift"
+  | "workspace-lockstep"
+  | "peer-dep-violation"
+  | "peer-dep-lockstep"
+  | "consumer-lockstep"
+  | "unsupported-range"
+  | "skipped";
 
 export interface Finding {
   kind: FindingKind;

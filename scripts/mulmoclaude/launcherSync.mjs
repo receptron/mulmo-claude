@@ -103,17 +103,30 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
 // against such a version therefore walked straight through the gate.
 const SEMVER_CORE = String.raw`(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?(?:\+[\w.-]+)?`;
 const SEMVER_RE = new RegExp(`^${SEMVER_CORE}$`);
-const SEMVER_TAIL_RE = new RegExp(String.raw`^[\^~>=]*\s*${SEMVER_CORE}$`);
+// Only the comparators `satisfies()` below can actually evaluate. The old
+// `[\^~>=]*` accepted any repetition or mixture, so `====4.7.0` and `>4.7.0`
+// both read as lower bound 4.7.0 — the first is not a range npm accepts at
+// all, and the second EXCLUDES 4.7.0. Both compared equal to a workspace at
+// 4.7.0 and produced no finding.
+const SEMVER_TAIL_RE = new RegExp(String.raw`^(?:\^|~|>=)?\s*${SEMVER_CORE}$`);
 
 // Parse a semver range's lower bound into [major, minor, patch].
 // Handles the subset the launcher actually uses: exact ("0.4.0"),
 // caret ("^0.4.0"), tilde ("~0.4.0"), and ">=" ("^0.5.0"-style is
 // enough). Returns null for anything unrecognised so the caller can
 // skip that entry with a clear reason (URLs, git deps, "*", "next").
-function parseLowerBound(range) {
-  if (typeof range !== "string") return null;
+// Specifiers that are legitimate npm but carry no comparable version:
+// `workspace:*`, a tarball URL, `*`. Not knowing their version is expected, so
+// they are skipped rather than failed — unlike a malformed version range.
+function isNonEvaluableRange(range) {
+  if (typeof range !== "string") return true;
   const trimmed = range.trim();
-  if (trimmed === "" || trimmed === "*" || trimmed.includes(":") || trimmed.startsWith("workspace")) return null;
+  return trimmed === "" || trimmed === "*" || trimmed.includes(":") || trimmed.startsWith("workspace");
+}
+
+function parseLowerBound(range) {
+  if (isNonEvaluableRange(range)) return null;
+  const trimmed = range.trim();
   const match = trimmed.match(SEMVER_TAIL_RE);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
@@ -184,10 +197,22 @@ function isOwnedByInvariant4(manifestPath, field, launcherPath) {
 // float a consumer forward, it pins it to the lower bound, so a stale
 // range withholds every release since from anyone installing it.
 function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion }) {
-  const lower = parseLowerBound(range);
   const source = parseVersion(workspaceVersion);
-  if (!lower || !source) {
-    return { kind: "skipped", message: `${relPath}: ${field}."${depName}"="${range}" unparseable — cannot verify vs workspace ${workspaceVersion}` };
+  if (isNonEvaluableRange(range) || !source) {
+    return {
+      kind: "skipped",
+      message: `${relPath}: ${field}."${depName}"="${range}" carries no comparable version — cannot verify vs workspace ${workspaceVersion}`,
+    };
+  }
+  const lower = parseLowerBound(range);
+  if (!lower) {
+    // `main()` drops skipped findings from the failure count, so skipping here
+    // would let a range npm cannot resolve — or one whose comparator excludes
+    // the very version it names — pass the gate silently.
+    return {
+      kind: "unsupported-range",
+      message: `${relPath}: ${field}."${depName}"="${range}" is not a range this gate can evaluate — use an exact version, ^, ~ or >=`,
+    };
   }
   // Compare the whole lower bound, not parsed numeric triples — those are wrong
   // in both directions: against the raw version string a correctly swept
@@ -236,6 +261,7 @@ export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
 //   workspace-lockstep      invariant 4 — launcher range lower bound == workspace source (strict ratchet)
 //   peer-dep-lockstep       invariant 5 — plugin peer dep lower bound major.minor == launcher pin major.minor
 //   consumer-lockstep       invariant 6 — EVERY manifest's internal dep range lower bound == workspace source
+//   unsupported-range       invariant 6 — an internal dep range this gate cannot evaluate (fails, never skips)
 //   skipped                 range unparseable → surface for triage
 export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
   const rootPkg = await readJson(path.join(root, "package.json"));
