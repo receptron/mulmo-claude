@@ -1,11 +1,10 @@
 import { isNonEmptyString, isRecord } from "../../utils/types.js";
 import { Router, Request, Response } from "express";
-import { realpathSync } from "fs";
 import { readdir, stat } from "fs/promises";
-import { readTextSafe, resolveWithinRoot } from "../../utils/files/safe.js";
-import path from "path";
+import { readTextSafe } from "../../utils/files/safe.js";
 import { workspacePath } from "../../workspace/workspace.js";
 import { WORKSPACE_PATHS } from "../../workspace/paths.js";
+import { mulmoScriptOps } from "../../plugins/mulmoscript-server.js";
 import {
   readSessionMeta as readSessionMetaIO,
   readSessionJsonl,
@@ -303,25 +302,20 @@ function isPresentMulmoScriptToolResult(entry: unknown): entry is PresentMulmoSc
 
 // Re-read the MulmoScript JSON pointed at by `entry.result.data.filePath`
 // and merge it into a copy of the entry. Returns the original entry on
-// any failure (missing file, traversal escape, parse error, absolute
-// path) so the detail route never breaks because of a single rotted
-// link. Path-traversal guard is realpath-based — see
-// resolveWithinRoot for why.
+// any failure (missing file, traversal escape, parse error) so the detail
+// route never breaks because of a single rotted link.
+//
+// Resolution goes through `mulmoScriptOps.resolveStory` rather than a
+// second hand-rolled copy of the rules: it is what every other mulmoScript
+// endpoint uses, so the file this refresh reads is by construction the file
+// the tool would open — including for the absolute `filePath` form, whose
+// edits would otherwise never survive a reload (the entry would keep
+// replaying the script as it was when the tool call ran).
 async function enrichWithMulmoScript(entry: PresentMulmoScriptToolResult): Promise<unknown> {
   try {
-    const storiesDir = path.resolve(WORKSPACE_PATHS.stories);
-    let storiesReal: string;
-    try {
-      storiesReal = realpathSync(storiesDir);
-    } catch {
-      return entry;
-    }
-    const scriptRelPath: string = entry.result.data.filePath;
-    if (path.isAbsolute(scriptRelPath)) return entry;
-    const relFromStories = scriptRelPath.startsWith("stories/") ? scriptRelPath.slice("stories/".length) : scriptRelPath;
-    const scriptPath = resolveWithinRoot(storiesReal, relFromStories);
-    if (!scriptPath) return entry;
-    const scriptJson = (await readTextSafe(scriptPath)) ?? "";
+    const resolved = mulmoScriptOps.resolveStory(entry.result.data.filePath);
+    if (!resolved.ok) return entry;
+    const scriptJson = (await readTextSafe(resolved.absolutePath)) ?? "";
     const script: unknown = JSON.parse(scriptJson);
     return {
       ...entry,

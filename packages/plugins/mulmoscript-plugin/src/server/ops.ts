@@ -44,7 +44,7 @@ import {
 import type { MulmoBeat, MulmoImagePromptMedia, MulmoStudioContext } from "@mulmocast/types";
 import { DEFAULT_ROOT, normalizeRoot } from "../core/contract";
 import type { MulmoScriptGenerationEvent } from "../core/contract";
-import { normalizeStoryPath, storyRefWithin, storiesRelativePath } from "../core/paths";
+import { isAbsoluteStoryPath, normalizeStoryPath, STORY_TARGET_EXTENSIONS, storyRefWithin, storiesRelativePath } from "../core/paths";
 import { errorMessage } from "@mulmoclaude/common";
 import { resolveWithinRoot } from "@mulmoclaude/core/files";
 import { fileToDataUri, stripDataUri } from "./support";
@@ -280,6 +280,21 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     return storyRefWithin(base, absolutePath, path);
   }
 
+  /**
+   * The wire ref for an artifact mulmocast generated FROM `wireFilePath`
+   * (movie, per-beat clip, PDF).
+   *
+   * mulmocast derives every output path from the script's own directory
+   * (`buildContext` passes `basedir: path.dirname(absoluteFilePath)`), so an
+   * absolute script's outputs live outside the stories dir and have no
+   * `stories/<rel>` spelling. They travel as absolute paths — the same form
+   * their script arrived in, which `resolveStory` reads back unchanged.
+   * A relative script keeps minting relative refs, byte for byte as before.
+   */
+  function outputRef(outputPath: string, wireFilePath: string, root?: string): string | null {
+    return path.isAbsolute(wireFilePath) ? outputPath : toStoryRef(outputPath, root);
+  }
+
   // Lazily realpath the stories dir on first use. We can't realpath at
   // instance creation because the directory may not exist yet (it's
   // created on demand by the save route). The cache is invalidated
@@ -313,7 +328,68 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   }
 
   /**
-   * Resolve and validate a stories wire path to its absolute realpath.
+   * Resolve an ABSOLUTE wire path — a script the caller named outside the
+   * stories dir, or one of the artifacts mulmocast generated beside it.
+   *
+   * Deliberately NOT containment-checked, for the reason spelled out on
+   * `isAbsoluteStoryPath`: opening a file the caller named is the purpose of
+   * the form, and the agent can already read and write those files directly.
+   * What IS checked mirrors `@mulmoclaude/core/files`' byPath ops:
+   *   - the lexical shape (no NUL, no `.` / `..` / empty segment, and one of
+   *     the extensions this package mints or accepts), so a vetted path cannot
+   *     be re-pointed later;
+   *   - a real REGULAR FILE, judged through `realpath` so a symlink is
+   *     assessed by what it points at and a directory named `deck.json` cannot
+   *     masquerade as a script.
+   *
+   * The media extensions widen the same way, which is what makes the download
+   * routes able to serve an absolute script's movie / clip / PDF. That is a
+   * deliberate consequence, not an oversight: those routes sit behind the same
+   * bearer auth as every other `/api` route, and a caller holding that token
+   * can already have presentDocument read any `.md` and presentHtml any
+   * `.html`. The boundary is the token, not the directory.
+   */
+  function resolveAbsoluteStory(filePath: string): { ok: true; absolutePath: string } | OpFailure {
+    // `backend.byPath` is the host's OPT-IN to the absolute form, and it gates
+    // the whole of it — not just the core's read/write. Without it these ops
+    // (generation, status, probes, download) would keep serving absolute paths
+    // that the core itself refuses, so a host that never opted in would have
+    // the capability anyway through the half of the package that does not
+    // consult it (Sourcery on #3042). Refusing here restores the pre-existing
+    // behaviour EXACTLY: absolute paths were `bad_request "Invalid filePath"`.
+    if (!backend.byPath) {
+      return opBadRequest("Invalid filePath");
+    }
+    if (!isAbsoluteStoryPath(filePath, STORY_TARGET_EXTENSIONS)) {
+      return opBadRequest("Invalid filePath");
+    }
+    let target: string;
+    try {
+      target = realpathSync(path.resolve(filePath));
+    } catch {
+      return opNotFound(`File not found: ${filePath}`);
+    }
+    try {
+      if (!statSync(target).isFile()) return opBadRequest("Invalid filePath");
+    } catch {
+      return opNotFound(`File not found: ${filePath}`);
+    }
+    // The extension is re-checked on the RESOLVED target, not just the
+    // spelling that arrived: a symlink named `deck.json` may point at any
+    // regular file, and the download routes stream `absolutePath` straight to
+    // the client — so checking only the link's own name would let `deck.json`
+    // → `/etc/passwd` through the very gate that exists to stop it
+    // (CodeRabbit CWE-59 on #3042). Judging the link by what it points at is
+    // the same rule the regular-file check above already applies.
+    if (!isAbsoluteStoryPath(target, STORY_TARGET_EXTENSIONS)) {
+      return opBadRequest("Invalid filePath");
+    }
+    return { ok: true, absolutePath: target };
+  }
+
+  /**
+   * Resolve and validate a RELATIVE stories wire path to its absolute
+   * realpath (absolute wire paths are handed to `resolveAbsoluteStory`).
    *
    * Uses the realpath-based resolveWithinRoot helper to defeat
    * symlink-based escapes. Callers pass wire paths like
@@ -324,6 +400,21 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * location. ENOENT and traversal are distinguished (404 vs 400).
    */
   function resolveStory(filePath: string, root?: string): { ok: true; absolutePath: string } | OpFailure {
+    // An ABSOLUTE path names a script (or one of its generated artifacts)
+    // living outside the stories dir, and is taken as named — the same rule
+    // `presentDocument` / `presentHtml` apply to their `path` argument
+    // (`@mulmoclaude/core/files`). Answered BEFORE the root checks below
+    // because an absolute path is relative to nothing: there is no root for it
+    // to be resolved against, so neither an unregistered root nor a stories
+    // dir that cannot be realpathed has any bearing on it.
+    //
+    // A value that is absolute only under ANOTHER platform's rules
+    // (`C:\\proj\\x.json` on POSIX) is NOT absolute here, and falls through to
+    // the relative rules, which reject it — resolving it would land it under
+    // the stories dir, a file nobody named.
+    if (path.isAbsolute(filePath)) {
+      return resolveAbsoluteStory(filePath);
+    }
     // An unregistered root is a bad request, not a fall back to the default:
     // resolving it against the workspace would hand the caller a DIFFERENT
     // file that happens to share the name.
@@ -333,11 +424,6 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
     const storiesReal = ensureStoriesReal(root);
     if (!storiesReal) {
       return opServerError("stories directory not available");
-    }
-    // Reject absolute paths and parent traversal at the syntactic
-    // level — defense in depth on top of the realpath check below.
-    if (path.isAbsolute(filePath)) {
-      return opBadRequest("Invalid filePath");
     }
     // Accept the workspace-relative spelling "artifacts/stories/<rel>"
     // the tool description historically taught (the wire form was truly
@@ -397,6 +483,12 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * symlinks), so hosts re-assert the realpath boundary here before
    * invoking it — a symlink planted below the stories dir can't read or
    * write outside the tree (Codex P1 on MulmoClaude#2133).
+   *
+   * For an ABSOLUTE `filePath` there is no tree to stay inside — the form
+   * exists precisely to name a file elsewhere — so what this asserts there is
+   * `resolveAbsoluteStory`'s pair: the lexical shape, and a real regular file
+   * behind the realpath. The core's `locate` reaches the same verdict through
+   * `isAbsoluteStoryPath`, which is why the two are one function.
    *
    * Returns null when `filePath` isn't a non-empty string — shape
    * validation (including the script-vs-filePath mode check) belongs to
@@ -580,8 +672,11 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    *  form: subscribers (the View's pubsub filter, `pendingGenerations`
    *  callers) match by exact string, so the accepted alias spellings
    *  (`artifacts/stories/<rel>`, bare `<rel>`) must collapse to the same
-   *  key as the canonical one (Codex P2 on #2139). Untrusted spellings
-   *  pass through unchanged — they never resolve, so they can't collide. */
+   *  key as the canonical one (Codex P2 on #2139). An ABSOLUTE path is
+   *  already its own canonical form — `normalizeStoryPath` refuses it, and
+   *  passing it through unchanged is exactly right, because it has no
+   *  stories-relative spelling to collapse to. Untrusted spellings pass
+   *  through too: they never resolve, so they can't collide. */
   function canonicalWirePath(filePath: string): string {
     return normalizeStoryPath(filePath) ?? filePath;
   }
@@ -750,7 +845,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       const { movieFile, soundEffectFile, lipSyncFile } = getBeatMoviePaths(context, beatIndex);
       const candidates = [lipSyncFile, soundEffectFile, movieFile, getBeatAnimatedVideoPath(context, beatIndex)];
       const existing = candidates.find((candidate) => existsSync(candidate));
-      return { ok: true, moviePath: existing ? toStoryRef(existing, root) : null };
+      return { ok: true, moviePath: existing ? outputRef(existing, filePath, root) : null };
     });
   }
 
@@ -765,19 +860,19 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   /** Shared "output exists and is newer than the source script" gate for
    *  movie / PDF status. A stale artifact (script edited after it was
    *  generated) reports null so the UI re-offers the Generate button. */
-  function freshOutputRef(outputPath: string, absoluteFilePath: string, root?: string): string | null {
+  function freshOutputRef(outputPath: string, absoluteFilePath: string, wireFilePath: string, root?: string): string | null {
     if (!existsSync(outputPath)) return null;
     const outputMtime = statSync(outputPath).mtimeMs;
     const sourceMtime = statSync(absoluteFilePath).mtimeMs;
     if (outputMtime < sourceMtime) return null;
-    return toStoryRef(outputPath, root);
+    return outputRef(outputPath, wireFilePath, root);
   }
 
   async function movieStatusOp(filePath: string, root?: string): Promise<OpResult<{ moviePath: string | null }>> {
     return runStoryOp(
       filePath,
       { operation: "movie-status", root, onContextMissing: () => ({ ok: true, moviePath: null }) },
-      async ({ absoluteFilePath, context }) => ({ ok: true, moviePath: freshOutputRef(movieFilePath(context), absoluteFilePath, root) }),
+      async ({ absoluteFilePath, context }) => ({ ok: true, moviePath: freshOutputRef(movieFilePath(context), absoluteFilePath, filePath, root) }),
     );
   }
 
@@ -787,7 +882,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
       { operation: "pdf-status", root, onContextMissing: () => ({ ok: true, pdfPath: null }) },
       async ({ absoluteFilePath, context }) => ({
         ok: true,
-        pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath, root),
+        pdfPath: freshOutputRef(pdfFilePath(context, PDF_MODE), absoluteFilePath, filePath, root),
       }),
     );
   }
@@ -1022,7 +1117,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         genError = result.error;
         return opServerError(result.error);
       }
-      const movieRef = toStoryRef(result.outputPath, root);
+      const movieRef = outputRef(result.outputPath, filePath, root);
       if (movieRef === null) return opServerError("generated movie is outside the registered stories root");
       return { ok: true, moviePath: movieRef };
     } catch (err) {
@@ -1178,7 +1273,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
         genError = result.error;
         return opServerError(result.error);
       }
-      const pdfRef = toStoryRef(result.outputPath, root);
+      const pdfRef = outputRef(result.outputPath, filePath, root);
       if (pdfRef === null) return opServerError("generated PDF is outside the registered stories root");
       return { ok: true, pdfPath: pdfRef };
     } catch (err) {
@@ -1193,6 +1288,7 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
   return {
     backend,
     toStoryRef,
+    outputRef,
     resolveStory,
     guardStoryWirePath,
     guardStoryRootRegistered,

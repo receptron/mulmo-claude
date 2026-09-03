@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeStoryPath, slugify, storyFilePath } from "../src/core/paths";
+import { isAbsoluteStoryPath, normalizeStoryPath, slugify, storyFilePath, STORY_SCRIPT_EXTENSIONS, STORY_TARGET_EXTENSIONS } from "../src/core/paths";
 
 describe("slugify", () => {
   it("collapses punctuation and case", () => {
@@ -61,5 +61,44 @@ describe("normalizeStoryPath", () => {
     assert.equal(normalizeStoryPath("stories\\foo.json"), null);
     assert.equal(normalizeStoryPath(""), null);
     assert.equal(normalizeStoryPath("stories"), null);
+  });
+});
+
+describe("isAbsoluteStoryPath — the absolute `filePath` form", () => {
+  it("accepts an absolute POSIX path to a .json script", () => {
+    assert.equal(isAbsoluteStoryPath("/Users/me/decks/keynote.json"), true);
+  });
+
+  it("accepts a Windows path even on POSIX", () => {
+    // The value may arrive from a remote host, so the LEXICAL gate is
+    // platform-independent. Whether it is absolute on THIS machine is the
+    // server's question (`resolveStory` requires native absoluteness).
+    assert.equal(isAbsoluteStoryPath("C:\\projects\\deck.json"), true);
+  });
+
+  it("refuses a relative path — that form keeps its stories-dir meaning", () => {
+    assert.equal(isAbsoluteStoryPath("stories/deck.json"), false);
+    assert.equal(isAbsoluteStoryPath("deck.json"), false);
+  });
+
+  it("refuses traversal, empty segments and NUL", () => {
+    assert.equal(isAbsoluteStoryPath("/a/../b/deck.json"), false);
+    assert.equal(isAbsoluteStoryPath("/a/./deck.json"), false);
+    assert.equal(isAbsoluteStoryPath("/a//deck.json"), false);
+    assert.equal(isAbsoluteStoryPath("/a/deck\0.json"), false);
+  });
+
+  it("refuses an extension outside the requested set", () => {
+    assert.equal(isAbsoluteStoryPath("/a/deck.md"), false);
+    assert.equal(isAbsoluteStoryPath("/a/deck.mp4"), false);
+    // …but the wider set the server mints wire refs in accepts the media.
+    assert.equal(isAbsoluteStoryPath("/a/deck.mp4", STORY_TARGET_EXTENSIONS), true);
+    assert.equal(isAbsoluteStoryPath("/a/deck.mov", STORY_TARGET_EXTENSIONS), true);
+    assert.equal(isAbsoluteStoryPath("/a/deck.pdf", STORY_TARGET_EXTENSIONS), true);
+    assert.equal(isAbsoluteStoryPath("/a/deck.json", STORY_TARGET_EXTENSIONS), true);
+  });
+
+  it("STORY_SCRIPT_EXTENSIONS is the default set", () => {
+    assert.deepEqual([...STORY_SCRIPT_EXTENSIONS], [".json"]);
   });
 });

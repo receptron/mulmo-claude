@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import {
+  STORY_SCRIPT_EXTENSIONS,
   executeMulmoScriptSave,
   executeUpdateBeat,
   executeUpdateScript,
@@ -7,6 +8,7 @@ import {
   type SaveMulmoScriptArgs,
 } from "@mulmoclaude/mulmoscript-plugin";
 import { makeArtifactsFileOps } from "../../plugins/runtime.js";
+import { makeByPathFileOps } from "../../utils/files/by-path.js";
 import { buildContext } from "@mulmoclaude/mulmoscript-plugin/server";
 import { mulmoScriptOps } from "../../plugins/mulmoscript-server.js";
 import { errorMessage } from "../../utils/errors.js";
@@ -92,7 +94,10 @@ function parseBeatQuery<TRes>(req: Request<object, TRes, object, BeatQuery>, res
 // `autoGenerateMovie` trigger (movie generation needs mulmocast/ffmpeg,
 // which stay host-side until phase 3).
 function makeExecuteContext() {
-  return { files: { artifacts: makeArtifactsFileOps() } };
+  // `byPath` is what lets presentMulmoScript open a script outside
+  // `artifacts/stories/` — the same capability presentDocument / presentHtml
+  // take for their `path` argument. A RELATIVE `filePath` never reaches it.
+  return { files: { artifacts: makeArtifactsFileOps(), byPath: makeByPathFileOps(STORY_SCRIPT_EXTENSIONS) } };
 }
 
 function sendPackageFailure(res: Response, failure: MulmoScriptFailure): void {
@@ -285,7 +290,7 @@ bindRoute(router, API_ROUTES.mulmoScript.generateMovie, async (req: Request<obje
       send({ type: "error", message: result.error });
       return;
     }
-    send({ type: "done", moviePath: mulmoScriptOps.toStoryRef(result.outputPath) });
+    send({ type: "done", moviePath: mulmoScriptOps.outputRef(result.outputPath, filePath) });
   } catch (err) {
     genError = errorMessage(err);
     send({ type: "error", message: genError });
@@ -451,7 +456,7 @@ async function handleGeneratePdf(req: Request<object, object, { filePath: string
       send({ type: "error", message: genError });
       return;
     }
-    send({ type: "done", pdfPath: mulmoScriptOps.toStoryRef(result.outputPath) });
+    send({ type: "done", pdfPath: mulmoScriptOps.outputRef(result.outputPath, filePath) });
   } catch (err) {
     genError = errorMessage(err);
     send({ type: "error", message: genError });

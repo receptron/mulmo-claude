@@ -125,7 +125,13 @@ export function createMulmoScriptDispatchHandler(ops: MulmoScriptServerOps): Mul
    */
   function executeContextFor(root: string | undefined): MulmoScriptExecuteContext | null {
     const artifacts = ops.artifactsForRoot(root);
-    return artifacts === null ? null : { files: { artifacts } };
+    if (artifacts === null) return null;
+    // `byPath` rides along when the host supplies it, so the dispatch route
+    // accepts the absolute `filePath` form on exactly the same terms as the
+    // host's REST route — one tool call must not mean two things depending on
+    // whether the View or the agent made it. It is root-independent: an
+    // absolute path is relative to nothing, so no root selects it.
+    return { files: { artifacts, ...(ops.backend.byPath ? { byPath: ops.backend.byPath } : {}) } };
   }
 
   async function saveKind(args: Record<string, unknown>): Promise<unknown> {

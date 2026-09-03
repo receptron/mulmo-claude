@@ -329,6 +329,7 @@ describe("the whole ops surface is classified for named roots", () => {
     "uploadBeatImageOp",
     "uploadCharacterImageOp",
     "toStoryRef",
+    "outputRef",
     "resolveStory",
     "guardStoryWirePath",
     "guardStoryRootRegistered",

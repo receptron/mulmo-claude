@@ -14,7 +14,7 @@ export const TOOL_DEFINITION: ToolDefinition = {
 Provide EXACTLY ONE of \`script\` or \`filePath\`:
 
 1. **Create new** — pass \`script\` (full MulmoScript JSON). Server saves it to disk and presents it.
-2. **Re-display existing** — pass \`filePath\` (the \`filePath\` returned by a previous call, e.g. "stories/my-story-1700000000000.json"; it is resolved against the workspace's \`artifacts/\` directory, NOT the workspace root). Much cheaper than re-sending the full script. Use whenever the user wants to revisit a presentation that was already created in this workspace.
+2. **Re-display existing** — pass \`filePath\` (the \`filePath\` returned by a previous call, e.g. "stories/my-story-1700000000000.json"; it is resolved against the workspace's \`artifacts/\` directory, NOT the workspace root — or an absolute path to a .json script anywhere on disk). Much cheaper than re-sending the full script. Use whenever the user wants to revisit a presentation that was already created in this workspace.
 3. **Edit one beat** — pass \`filePath\` PLUS \`beatIndex\` and \`beat\`. Replaces that one beat and presents the result. **Use this whenever the user asks to change part of an existing presentation** — re-sending the whole script instead wastes tokens and overwrites anything edited in the canvas meanwhile.
 
 Optional \`autoGenerateMovie: true\` kicks off movie generation in the background, so the final video is ready by the time the user opens the canvas. Movie generation is expensive (multiple image + audio API calls + video encoding) — only set this when the user has explicitly asked for the movie. Default \`false\`.
@@ -109,7 +109,7 @@ IMPORTANT: "imagePrompt" and "moviePrompt" are plain string fields on the beat, 
       filePath: {
         type: "string",
         description:
-          "Path of an EXISTING MulmoScript JSON file, as returned by a previous call (e.g. 'stories/my-story-1700000000000.json'). Resolved against the workspace's `artifacts/` directory, not the workspace root ('artifacts/stories/…' is also accepted). Use this to re-display a script previously saved in this workspace, instead of resending the full JSON. Do NOT pass alongside `script`.",
+          "Path of an EXISTING MulmoScript JSON file. Either a relative path as returned by a previous call (e.g. 'stories/my-story-1700000000000.json'), resolved against the workspace's `artifacts/` directory, not the workspace root ('artifacts/stories/…' is also accepted) — or an ABSOLUTE path to a .json script anywhere on disk (e.g. '/Users/me/decks/keynote.json'), for a script that was not saved by this tool. Generated output (movie, PDF, beat media) is written beside the script, so an absolute script's artifacts land in ITS directory, not the workspace. Use this to re-display an existing script instead of resending the full JSON. Do NOT pass alongside `script`.",
       },
       beatIndex: {
         type: "number",
