@@ -552,6 +552,33 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     }
   });
 
+  it("compares an npm: alias that targets the same package", async () => {
+    // `npm:@mulmoclaude/core@^4.6.0` pins core exactly as `^4.6.0` does. It
+    // was skipped wholesale because `npm` is an aliasing protocol.
+    const stale = await auditConsumerPair("4.7.0", "npm:@mulmoclaude/core@^4.6.0");
+    assert.equal(consumerLockstepCount(stale), 1);
+    assert.equal(stale.filter((finding) => finding.kind === "skipped").length, 0);
+    assert.deepEqual(await auditConsumerPair("4.7.0", "npm:@mulmoclaude/core@^4.7.0"), [], "an in-step alias is in step");
+  });
+
+  it("still skips an npm: alias pointing at a different package", async () => {
+    // The workspace's version says nothing about another package's range.
+    const findings = await auditConsumerPair("4.7.0", "npm:some-other-pkg@^1.0.0");
+    assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1);
+    assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0);
+  });
+
+  it("does not claim a direction the comparison never tests", async () => {
+    // The check reports any mismatch, so a range AHEAD of the workspace gets
+    // the same finding; saying it "is behind" was wrong guidance there.
+    const ahead = await auditConsumerPair("4.7.0", "^4.8.0");
+    assert.equal(consumerLockstepCount(ahead), 1);
+    const [finding] = ahead;
+    assert.ok(finding);
+    assert.match(finding.message, /must equal/);
+    assert.doesNotMatch(finding.message, /is behind/);
+  });
+
   it("checks every dependency field the manifest declares, not a remembered three", async () => {
     // `optionalDependencies` was exempt — the field list was hard-coded, and
     // then, after it was derived from the manifest, the derivation was still

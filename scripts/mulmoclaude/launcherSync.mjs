@@ -178,12 +178,35 @@ const VERSIONLESS_PROTOCOLS = new Set([
 const WORKSPACE_PREFIX = "workspace:";
 const VERSIONLESS_WORKSPACE_FORMS = new Set(["*", "^", "~"]);
 
-function unwrapWorkspaceProtocol(range) {
+const NPM_PREFIX = "npm:";
+
+// `npm:name@range` aliases the dependency to another package. When the alias
+// targets THIS SAME package it is just a range with extra ceremony —
+// `npm:@mulmoclaude/core@^4.6.0` pins core exactly as `^4.6.0` does — so it
+// must be compared, not skipped. When it targets a DIFFERENT package the
+// workspace's version says nothing about it, and skipping is correct.
+// Split on the last `@` so scoped names survive.
+function unwrapNpmAlias(trimmed, depName) {
+  const spec = trimmed.slice(NPM_PREFIX.length);
+  const at = spec.lastIndexOf("@");
+  if (at <= 0) return null;
+  return spec.slice(0, at) === depName ? spec.slice(at + 1) : null;
+}
+
+// Reduce a declared specifier to the range it states about `depName`, or
+// return it unchanged when it is not one of the protocols that can wrap one.
+function resolveSpecifier(range, depName) {
   if (typeof range !== "string") return range;
   const trimmed = range.trim();
-  if (!trimmed.toLowerCase().startsWith(WORKSPACE_PREFIX)) return trimmed;
-  const inner = trimmed.slice(WORKSPACE_PREFIX.length);
-  return VERSIONLESS_WORKSPACE_FORMS.has(inner) ? "*" : inner;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith(WORKSPACE_PREFIX)) {
+    const inner = trimmed.slice(WORKSPACE_PREFIX.length);
+    return VERSIONLESS_WORKSPACE_FORMS.has(inner) ? "*" : inner;
+  }
+  if (lower.startsWith(NPM_PREFIX)) {
+    return unwrapNpmAlias(trimmed, depName) ?? trimmed;
+  }
+  return trimmed;
 }
 
 function isVersionlessSpecifier(range) {
@@ -294,7 +317,7 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
       message: `${relPath}: ${field}."${depName}" points at workspace ${depName}, whose own version "${workspaceVersion}" is not valid SemVer — no consumer of it can be verified`,
     };
   }
-  const specifier = unwrapWorkspaceProtocol(range);
+  const specifier = resolveSpecifier(range, depName);
   if (isVersionlessSpecifier(specifier)) {
     return {
       kind: "skipped",
@@ -316,7 +339,7 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
   if (comparableVersion(specifier) === comparableVersion(workspaceVersion)) return null;
   return {
     kind: "consumer-lockstep",
-    message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,
+    message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) does not match workspace source ${workspaceVersion} — the lower bound must equal it, so sweep this range too`,
   };
 }
 
