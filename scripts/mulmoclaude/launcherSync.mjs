@@ -140,12 +140,36 @@ const COMPARATOR_PREFIX_RE = new RegExp(`^${COMPARATOR}`);
 // parse is a malformed declaration and must FAIL, not slip through the same
 // door. Stating the rule this way rather than listing bad inputs is what
 // keeps `""`, `"workspacefoo"` and a non-string value out of it.
-const SCHEME_SPECIFIER_RE = /^[a-z][a-z0-9+.-]*:/i;
+// An ALLOW-LIST, not a pattern. `^[a-z][a-z0-9+.-]*:` looked like the same
+// idea and was not: it matched any word followed by a colon, so
+// `totally-invalid:4.6.0` was classified as a versionless route and skipped.
+// The protocols are a finite set the package managers define, so name them;
+// the malformed inputs are infinite, so never try to name those.
+const VERSIONLESS_PROTOCOLS = new Set([
+  "workspace",
+  "npm",
+  "file",
+  "link",
+  "portal",
+  "patch",
+  "git",
+  "git+ssh",
+  "git+http",
+  "git+https",
+  "git+file",
+  "http",
+  "https",
+  "github",
+  "gitlab",
+  "bitbucket",
+]);
 
 function isVersionlessSpecifier(range) {
   if (typeof range !== "string") return false;
   const trimmed = range.trim();
-  return trimmed === "*" || SCHEME_SPECIFIER_RE.test(trimmed);
+  if (trimmed === "*") return true;
+  const colon = trimmed.indexOf(":");
+  return colon > 0 && VERSIONLESS_PROTOCOLS.has(trimmed.slice(0, colon).toLowerCase());
 }
 
 function parseLowerBound(range) {

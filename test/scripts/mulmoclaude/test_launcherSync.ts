@@ -509,7 +509,15 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
 
   it("skips ONLY specifiers that resolve by a route naming no version", async () => {
     // These are legitimate npm and genuinely carry no version to compare.
-    for (const range of ["*", "workspace:*", "npm:@scope/pkg@1.2.3", "https://example.com/pkg.tgz", "file:../core"]) {
+    for (const range of [
+      "*",
+      "workspace:*",
+      "npm:@scope/pkg@1.2.3",
+      "https://example.com/pkg.tgz",
+      "file:../core",
+      "git+ssh://git@host/x.git",
+      "github:owner/repo",
+    ]) {
       const findings = await auditConsumerPair("4.7.0", range);
       assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1, `${range} should skip`);
       assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0, `${range} should not fail`);
@@ -522,7 +530,7 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     // versionless specifiers, and each one used to pass the gate silently:
     // "" and "workspacefoo" matched the old prefix test, and a non-string
     // value short-circuited it entirely.
-    for (const range of ["", "   ", "workspacefoo", "workspace", "not-a-version", "====4.7.0", ">4.7.0"]) {
+    for (const range of ["", "   ", "workspacefoo", "workspace", "not-a-version", "====4.7.0", ">4.7.0", "totally-invalid:4.6.0", "foo:1.2.3", ":4.6.0"]) {
       const findings = await auditConsumerPair("4.7.0", range);
       assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1, `${JSON.stringify(range)} must fail`);
       assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, `${JSON.stringify(range)} must not skip`);
