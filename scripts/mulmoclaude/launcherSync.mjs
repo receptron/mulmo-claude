@@ -95,6 +95,11 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
         peerDependencies: pkg.peerDependencies ?? {},
         dependencies: pkg.dependencies ?? {},
         devDependencies: pkg.devDependencies ?? {},
+        // The manifest as written. Copying three named fields is what made
+        // `optionalDependencies` invisible even after the field list was
+        // derived rather than hard-coded — the derivation was reading the
+        // copy, not the source.
+        manifest: pkg,
       });
     }
   }
@@ -243,11 +248,21 @@ export function satisfies(version, range) {
   return v[0] === lb[0] && v[1] === lb[1] && v[2] === lb[2];
 }
 
-// Every field a manifest can declare an internal dep in. A stale range
-// is equally wrong in all three: `dependencies` ships it, `peer` states
-// what the host must provide, and `dev` is what the package built and
-// tested against.
-const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies"];
+// Read the dependency fields OFF the manifest rather than listing them. A
+// stale range is equally wrong in all of them — `dependencies` ships it,
+// `peer` states what the host must provide, `dev` is what the package built
+// against, `optional` still resolves when present — and a hard-coded trio
+// silently exempted `optionalDependencies`, which this repo already uses.
+// Deriving them means the next field npm adds is covered on arrival.
+// `bundledDependencies` is excluded by the object test: it is an array of
+// names carrying no ranges, so there is nothing to compare.
+function dependencyFields(pkg) {
+  return Object.keys(pkg).filter((key) => /dependencies$/i.test(key) && isPlainObject(pkg[key]));
+}
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 // Invariant 4 owns the LOCKSTEP COMPARISON for the launcher's own
 // `dependencies` — reporting that drift twice would make one bad release read
@@ -314,12 +329,12 @@ export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
   const launcherPath = path.join(root, LAUNCHER_REL);
   const manifests = [{ manifestPath: path.join(root, "package.json"), pkg: rootPkg }];
   for (const ws of workspaces.values()) {
-    manifests.push({ manifestPath: ws.packageJsonPath, pkg: ws });
+    manifests.push({ manifestPath: ws.packageJsonPath, pkg: ws.manifest ?? ws });
   }
   const findings = [];
   for (const { manifestPath, pkg } of manifests) {
     const relPath = path.relative(root, manifestPath) || "package.json";
-    for (const field of DEP_FIELDS) {
+    for (const field of dependencyFields(pkg)) {
       const lockstepOwnedElsewhere = isLockstepOwnedByInvariant4(manifestPath, field, launcherPath);
       for (const [depName, range] of Object.entries(pkg[field] ?? {})) {
         const target = workspaces.get(depName);

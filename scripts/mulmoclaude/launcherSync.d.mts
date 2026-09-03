@@ -9,6 +9,8 @@ export interface WorkspacePackage {
   peerDependencies: Record<string, string>;
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  /** The manifest exactly as written, so field discovery reads the source. */
+  manifest: Record<string, unknown>;
 }
 
 export type FindingKind =

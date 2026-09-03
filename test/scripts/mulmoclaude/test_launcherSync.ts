@@ -333,7 +333,7 @@ describe("auditLauncherSync — invariant 5: gui-chat-protocol peer dep lockstep
 // Invariant-6 cases all have the same shape: one workspace package, one
 // consumer declaring a range on it. Naming that shape keeps each `it` to the
 // pair of versions under test and guarantees the temp repo is always removed.
-async function auditConsumerPair(coreVersion: string, consumerRange: string, field: "peerDependencies" | "devDependencies" = "peerDependencies") {
+async function auditConsumerPair(coreVersion: string, consumerRange: string, field = "peerDependencies") {
   const root = makeFakeRepo({
     root: { name: "monorepo", dependencies: {} },
     launcher: { name: "mulmoclaude", dependencies: {} },
@@ -549,6 +549,16 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
       const findings = await auditConsumerPair("4.7.0", range);
       assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1, `${JSON.stringify(range)} must fail`);
       assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, `${JSON.stringify(range)} must not skip`);
+    }
+  });
+
+  it("checks every dependency field the manifest declares, not a remembered three", async () => {
+    // `optionalDependencies` was exempt — the field list was hard-coded, and
+    // then, after it was derived from the manifest, the derivation was still
+    // reading a three-field COPY the registry kept rather than the manifest
+    // itself. The repo already uses the field, so this was a live gap.
+    for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+      assert.equal(consumerLockstepCount(await auditConsumerPair("4.7.0", "^4.5.0", field)), 1, `${field} must be audited`);
     }
   });
 
