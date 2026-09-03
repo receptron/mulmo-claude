@@ -7,12 +7,12 @@
 // `skillsStagingDir`, which is what lets the storage layer be reasoned about
 // (and eventually packaged) without dragging the skill layout along.
 
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceRoot, stagingSkillDir } from "./host";
 import { toPosixRelPath } from "../../files/relPath.js";
 import { isRegularFile, type IoOptions } from "./io";
-import { resolveTemplatePath, safeSlugName } from "./paths";
+import { resolveTemplatePath, safeSlugName, SCHEMA_FILE } from "./paths";
 import type { CollectionItem, CollectionSchema } from "../core/schema";
 import type { LoadedCollection } from "./discoveredCollection";
 import { isErrorWithCode, isRecord } from "@mulmoclaude/common";
@@ -45,6 +45,72 @@ export async function readCustomViewHtml(collection: SourceAwareReadTarget, view
   return readSourceAwareFile(collection, viewFile, opts);
 }
 
+/** `<staging>/<slug>` when THAT slug is actually staged there, else null.
+ *
+ *  `stagingSkillDir` only says whether the ROOT has a staging tree, and then
+ *  joins the slug — so on its own it claims every collection in a staged
+ *  workspace is staged. That is wrong for the two layouts that coexist there:
+ *  a collection IMPORTED via the discover panel, and one committed directly
+ *  under `.claude/skills/`, neither of which has a staging copy. A stale
+ *  `data/skills/<slug>/views/x.html` left beside them then SHADOWED the real
+ *  view on every read (#3031).
+ *
+ *  The evidence is the slug's own `schema.json`, because that is what the
+ *  authoring layout actually produces — `putSchema` writes it, and the delete
+ *  path below has always keyed on it. It must be a REGULAR FILE — `lstat`, not
+ *  `stat` — so a symlink standing in for the schema is not evidence.
+ *
+ *  Exported so the DELETE path uses this exact function rather than a second
+ *  copy of the expression: "reads and deletes agree" is a claim `views.ts` has
+ *  made in its comments since #1836, and sharing the predicate is what makes
+ *  it structurally true instead of a convention two files have to remember. */
+export async function stagedSkillDir(workspaceRoot: string, safeSlug: string): Promise<string | null> {
+  const staging = stagingSkillDir(workspaceRoot, safeSlug);
+  if (staging === null) return null;
+  return (await isStagedSchema(path.join(staging, SCHEMA_FILE))) ? staging : null;
+}
+
+/** Is the staged `schema.json` there, as a regular file?
+ *
+ *  NOT `isRegularFile` from `io.ts`, which answers `false` for every `lstat`
+ *  failure. Here "no schema" and "the schema could not be inspected" must not
+ *  collapse into one answer: the second would quietly downgrade a staged slug
+ *  to unstaged and serve the OTHER base's copy — the same masking the read loop
+ *  below refuses, and for the same reason (Sourcery review on #3032). Only the
+ *  missing-here codes mean "not staged"; anything else propagates. */
+async function isStagedSchema(target: string): Promise<boolean> {
+  try {
+    return (await lstat(target)).isFile();
+  } catch (err) {
+    if (!isMissingHere(err)) throw err;
+    return false;
+  }
+}
+
+/** The two codes that mean "not at this path" rather than "this path failed".
+ *  A permission denial / disk error must propagate — silently treating it as
+ *  absent masks a real failure as a stale-from-another-base success or a
+ *  misleading 404 (CodeRabbit review on #1836). */
+function isMissingHere(err: unknown): boolean {
+  return isErrorWithCode(err) && (err.code === "ENOENT" || err.code === "ENOTDIR");
+}
+
+/** Read `relPath` from the first base that holds it, or null when none does.
+ *  Bases are tried in order and each is containment-checked on its own, so the
+ *  fallback never widens what a single base would have allowed. */
+async function readFromBases(bases: readonly string[], relPath: string): Promise<string | null> {
+  for (const base of bases) {
+    const resolved = resolveTemplatePath(base, relPath);
+    if (resolved === null) continue;
+    try {
+      return await readFile(resolved, "utf-8");
+    } catch (err) {
+      if (!isMissingHere(err)) throw err;
+    }
+  }
+  return null;
+}
+
 /** Internal helper: read a file using the same source-aware base fallback as
  *  `readCustomViewHtml`. Used by both `readCustomViewHtml` and
  *  `readCustomViewI18n` so the two stay in lockstep. */
@@ -52,28 +118,15 @@ async function readSourceAwareFile(collection: SourceAwareReadTarget, relPath: s
   const safeSlug = safeSlugName(collection.slug);
   if (safeSlug === null) return null;
   const workspaceRoot = opts.workspaceRoot ?? getWorkspaceRoot();
-  // A root with NO staging tree (`stagingSkillDir` → null) reads the skill dir
-  // alone. Adding a synthetic staging base there is not merely redundant: a
+  // A slug with no staged `schema.json` (`stagedSkillDir` → null) reads the
+  // skill dir alone. Adding a staging base there is not merely redundant: a
   // stray `<root>/data/skills/<slug>/views/x.html` left behind by an agent that
   // followed the staged authoring instructions would SHADOW the committed
-  // `.claude/skills/<slug>/views/x.html` on every read.
-  const staging = collection.source === "project" ? stagingSkillDir(workspaceRoot, safeSlug) : null;
-  const bases = staging === null ? [collection.skillDir] : [staging, collection.skillDir];
-  for (const base of bases) {
-    const resolved = resolveTemplatePath(base, relPath);
-    if (resolved === null) continue;
-    try {
-      return await readFile(resolved, "utf-8");
-    } catch (err) {
-      // Only the "file missing here" codes should trigger the fallback. A
-      // permission denial / disk error must propagate — silently falling back
-      // would mask a real failure as a stale-from-other-base success or a
-      // misleading 404 (CodeRabbit review on #1836).
-      if (!isErrorWithCode(err)) throw err;
-      if (err.code !== "ENOENT" && err.code !== "ENOTDIR") throw err;
-    }
-  }
-  return null;
+  // `.claude/skills/<slug>/views/x.html` on every read. That holds per SLUG,
+  // not per root — a staged workspace also carries imported and directly
+  // committed collections, and they must read their own copy (#3031).
+  const staging = collection.source === "project" ? await stagedSkillDir(workspaceRoot, safeSlug) : null;
+  return readFromBases(staging === null ? [collection.skillDir] : [staging, collection.skillDir], relPath);
 }
 
 export interface CustomViewI18nResult {
