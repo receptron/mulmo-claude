@@ -10,6 +10,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Fixed
 
+#### A stdio MCP server opted into `hostExecInDocker` never reached the agent (#3018, PR #3036)
+
+The documented opt-in that runs a stdio MCP server on the host while the Docker sandbox is on has
+never worked, for any server, since it shipped in #1421 Phase B (2026-05-18). The shim logged
+`stdio→http shim ready`, `/api/diagnostics/report` listed the server, and the agent got zero
+tools. Two independent defects, either one enough on its own.
+
+**The spec named the wrong transport.** `prepareUserServers` wrote `{ type: "http", url: "…/sse" }`,
+but `supergateway` defaults `--outputTransport` to `sse` for `--stdio` and serves a GET stream at
+`/sse` with POSTed messages at `/message` — there is no `POST /sse`. The CLI treats `type: "http"`
+as Streamable HTTP, so it POSTed `initialize` to the stream path, took a 404, and registered the
+server with no tools.
+
+**The readiness probe consumed the gateway's only session.** `supergateway` keeps a single MCP
+`Server` and calls `server.connect()` on every `GET /sse`; the second connect throws
+`Already connected to a transport` inside an Express handler, which is unhandled and takes the
+gateway down with its stdio child. `probeOnce` opened that stream and never released it, so the
+agent's connect was always the fatal second one. Closing the probe's stream does not help — the
+gateway never calls `server.close()`. Readiness is now proven by `POST /message` without a
+`sessionId`, which answers 400 from a route that never touches the `Server`.
+
+**Why both signals looked healthy.** The `shim ready` log came from a probe that validated the
+**SSE** endpoint while the caller labelled the spec `http` — the probe was quietly proving the
+mismatch. And "MCP servers" in `/api/diagnostics/report` is `Object.keys(loadMcpConfig().mcpServers)`,
+read from `config/mcp.json`: it reports what is **configured**, never what is **connected**. The
+CLI does report `status: "failed"` for the server, but nothing on the host side reads it, so no
+error surfaced.
+
+**Nothing to change in your config.** A `config/mcp.json` entry that was correct before is correct
+now. User config still accepts only `http` and `stdio`; the `sse` spec is produced internally by
+the shim and `isMcpServerSpec` continues to reject it, so the Settings UI gains no new option.
+
+Verified end to end through the real `prepareUserServers` + `startStdioHttpShim` + `claude` CLI
+against `@modelcontextprotocol/server-memory`: `status: "connected"` with all nine tools.
+
 #### `@mulmoclaude/core@4.7.0` — a version-only republish of 4.6.0, no code change
 
 Released 2026-09-03. The 4.6.0 publish had already landed when the release was re-run, and npm
