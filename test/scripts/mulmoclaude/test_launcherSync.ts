@@ -507,25 +507,40 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     }
   });
 
-  it("surfaces an unparseable consumer range as skipped, never as a failure", async () => {
-    const root = makeFakeRepo({
-      root: { name: "monorepo", dependencies: {} },
-      launcher: { name: "mulmoclaude", dependencies: {} },
-      workspaces: [
-        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.7.0" } },
-        {
-          dir: "packages/plugins/foo-plugin",
-          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", dependencies: { "@mulmoclaude/core": "workspace:*" } },
-        },
-      ],
-    });
-    try {
-      const findings = await sync.auditLauncherSync({ root });
-      assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0, "a range we cannot parse must not fail the gate");
-      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+  it("skips ONLY specifiers that resolve by a route naming no version", async () => {
+    // These are legitimate npm and genuinely carry no version to compare.
+    for (const range of ["*", "workspace:*", "npm:@scope/pkg@1.2.3", "https://example.com/pkg.tgz", "file:../core"]) {
+      const findings = await auditConsumerPair("4.7.0", range);
+      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 1, `${range} should skip`);
+      assert.equal(findings.filter((finding) => finding.kind !== "skipped").length, 0, `${range} should not fail`);
     }
+  });
+
+  it("fails every other unreadable value instead of skipping it", async () => {
+    // `main()` drops skipped findings from the failure count, so anything
+    // routed to `skipped` is approved. These are malformed declarations, not
+    // versionless specifiers, and each one used to pass the gate silently:
+    // "" and "workspacefoo" matched the old prefix test, and a non-string
+    // value short-circuited it entirely.
+    for (const range of ["", "   ", "workspacefoo", "workspace", "not-a-version", "====4.7.0", ">4.7.0"]) {
+      const findings = await auditConsumerPair("4.7.0", range);
+      assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1, `${JSON.stringify(range)} must fail`);
+      assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, `${JSON.stringify(range)} must not skip`);
+    }
+  });
+
+  it("fails a non-string dependency value", async () => {
+    const findings = await auditConsumerPair("4.7.0", null as unknown as string);
+    assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1);
+  });
+
+  it("fails a workspace whose OWN version is not SemVer", async () => {
+    // One malformed version in a workspace's package.json would otherwise
+    // disable this invariant for every consumer of that workspace at once —
+    // the gate would exit 0 with every consumer range stale.
+    const findings = await auditConsumerPair("4.8", "^4.5.0");
+    assert.equal(findings.filter((finding) => finding.kind === "invalid-workspace-version").length, 1);
+    assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, "a broken source version must not silence the gate");
   });
 });
 

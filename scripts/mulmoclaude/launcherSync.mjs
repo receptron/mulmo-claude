@@ -108,24 +108,33 @@ const SEMVER_RE = new RegExp(`^${SEMVER_CORE}$`);
 // both read as lower bound 4.7.0 — the first is not a range npm accepts at
 // all, and the second EXCLUDES 4.7.0. Both compared equal to a workspace at
 // 4.7.0 and produced no finding.
-const SEMVER_TAIL_RE = new RegExp(String.raw`^(?:\^|~|>=)?\s*${SEMVER_CORE}$`);
+const COMPARATOR = String.raw`(?:\^|~|>=)?\s*`;
+const SEMVER_TAIL_RE = new RegExp(`^${COMPARATOR}${SEMVER_CORE}$`);
+const COMPARATOR_PREFIX_RE = new RegExp(`^${COMPARATOR}`);
 
 // Parse a semver range's lower bound into [major, minor, patch].
 // Handles the subset the launcher actually uses: exact ("0.4.0"),
 // caret ("^0.4.0"), tilde ("~0.4.0"), and ">=" ("^0.5.0"-style is
 // enough). Returns null for anything unrecognised so the caller can
 // skip that entry with a clear reason (URLs, git deps, "*", "next").
-// Specifiers that are legitimate npm but carry no comparable version:
-// `workspace:*`, a tarball URL, `*`. Not knowing their version is expected, so
-// they are skipped rather than failed — unlike a malformed version range.
-function isNonEvaluableRange(range) {
-  if (typeof range !== "string") return true;
+// `main()` drops skipped findings from the failure count, so routing an input
+// to `skipped` approves it. That makes the set deliberately CLOSED: a
+// specifier is skipped only when npm resolves it by a route that names no
+// version — the `*` wildcard, or a scheme-prefixed specifier (`workspace:`,
+// `npm:`, `file:`, `git+ssh:`, an https tarball). Anything else that fails to
+// parse is a malformed declaration and must FAIL, not slip through the same
+// door. Stating the rule this way rather than listing bad inputs is what
+// keeps `""`, `"workspacefoo"` and a non-string value out of it.
+const SCHEME_SPECIFIER_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+function isVersionlessSpecifier(range) {
+  if (typeof range !== "string") return false;
   const trimmed = range.trim();
-  return trimmed === "" || trimmed === "*" || trimmed.includes(":") || trimmed.startsWith("workspace");
+  return trimmed === "*" || SCHEME_SPECIFIER_RE.test(trimmed);
 }
 
 function parseLowerBound(range) {
-  if (isNonEvaluableRange(range)) return null;
+  if (typeof range !== "string" || isVersionlessSpecifier(range)) return null;
   const trimmed = range.trim();
   const match = trimmed.match(SEMVER_TAIL_RE);
   if (!match) return null;
@@ -140,7 +149,7 @@ function parseLowerBound(range) {
 function comparableVersion(value) {
   return String(value)
     .trim()
-    .replace(/^[\^~>=]*\s*/, "")
+    .replace(COMPARATOR_PREFIX_RE, "")
     .replace(/\+[\w.-]+$/, "");
 }
 
@@ -198,20 +207,26 @@ function isOwnedByInvariant4(manifestPath, field, launcherPath) {
 // range withholds every release since from anyone installing it.
 function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion }) {
   const source = parseVersion(workspaceVersion);
-  if (isNonEvaluableRange(range) || !source) {
+  if (!source) {
+    // Not the consumer's fault, and NOT skippable: one malformed version in a
+    // workspace's own package.json would otherwise disable this invariant for
+    // every consumer of that workspace at once.
+    return {
+      kind: "invalid-workspace-version",
+      message: `${relPath}: ${field}."${depName}" points at workspace ${depName}, whose own version "${workspaceVersion}" is not valid SemVer — no consumer of it can be verified`,
+    };
+  }
+  if (isVersionlessSpecifier(range)) {
     return {
       kind: "skipped",
-      message: `${relPath}: ${field}."${depName}"="${range}" carries no comparable version — cannot verify vs workspace ${workspaceVersion}`,
+      message: `${relPath}: ${field}."${depName}"="${range}" resolves by a route that names no version — nothing to compare against workspace ${workspaceVersion}`,
     };
   }
   const lower = parseLowerBound(range);
   if (!lower) {
-    // `main()` drops skipped findings from the failure count, so skipping here
-    // would let a range npm cannot resolve — or one whose comparator excludes
-    // the very version it names — pass the gate silently.
     return {
       kind: "unsupported-range",
-      message: `${relPath}: ${field}."${depName}"="${range}" is not a range this gate can evaluate — use an exact version, ^, ~ or >=`,
+      message: `${relPath}: ${field}."${depName}"=${JSON.stringify(range)} is not a range this gate can evaluate — use an exact version, ^, ~ or >=`,
     };
   }
   // Compare the whole lower bound, not parsed numeric triples — those are wrong
@@ -262,6 +277,7 @@ export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
 //   peer-dep-lockstep       invariant 5 — plugin peer dep lower bound major.minor == launcher pin major.minor
 //   consumer-lockstep       invariant 6 — EVERY manifest's internal dep range lower bound == workspace source
 //   unsupported-range       invariant 6 — an internal dep range this gate cannot evaluate (fails, never skips)
+//   invalid-workspace-version invariant 6 — a workspace's own version is not SemVer (fails; it blinds every consumer)
 //   skipped                 range unparseable → surface for triage
 export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
   const rootPkg = await readJson(path.join(root, "package.json"));

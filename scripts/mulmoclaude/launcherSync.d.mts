@@ -19,6 +19,7 @@ export type FindingKind =
   | "peer-dep-lockstep"
   | "consumer-lockstep"
   | "unsupported-range"
+  | "invalid-workspace-version"
   | "skipped";
 
 export interface Finding {
