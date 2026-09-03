@@ -611,3 +611,30 @@ describe("makeDevPluginFixture", () => {
     }
   });
 });
+
+describe("packFilenameFrom", () => {
+  // `npm pack --json` has no single output shape, and this stage is the
+  // documented go/no-go for every launcher release — reading only the shapes
+  // one npm version happens to emit breaks the gate for everyone the moment
+  // CI's runners move.
+  it("reads the array form npm 11 and earlier emit", () => {
+    assert.equal(tarball.packFilenameFrom(JSON.stringify([{ filename: "a.tgz" }])), "a.tgz");
+  });
+
+  it("reads the object-keyed-by-package-name form npm 12 emits", () => {
+    // The shape that made a successful pack report "produced no filename".
+    assert.equal(tarball.packFilenameFrom(JSON.stringify({ "@mulmobridge/chat-service": { filename: "c.tgz" } })), "c.tgz");
+  });
+
+  it("reads a flat object", () => {
+    assert.equal(tarball.packFilenameFrom(JSON.stringify({ filename: "b.tgz" })), "b.tgz");
+  });
+
+  it("returns null for an error payload rather than inventing a name", () => {
+    assert.equal(tarball.packFilenameFrom(JSON.stringify({ error: { code: "EALLOWGIT" } })), null);
+  });
+
+  it("returns null for output that is not JSON at all", () => {
+    assert.equal(tarball.packFilenameFrom("boom"), null);
+  });
+});

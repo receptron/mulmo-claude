@@ -8,6 +8,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+---
+
+## [1.15.1] - 2026-09-03
+
+**A stdio MCP server run on the host from inside the Docker sandbox now actually reaches the agent.**
+
 ### Fixed
 
 #### A stdio MCP server opted into `hostExecInDocker` never reached the agent (#3018, PR #3036)
@@ -96,6 +102,8 @@ minors, so they resolve 4.6.0 on their own; nothing in this tree imports `staged
 published package, so the sweep would be tidiness rather than delivery (the same reasoning as
 4.1.1 / 4.3.0). Also refreshed in this window: `zod` `^4.5.2` → `^4.5.4`, plus `@types/node` and
 `tsx` on the dev side (PR #3030).
+
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.7.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.5.2`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 
