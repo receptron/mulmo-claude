@@ -10,9 +10,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Fixed
 
+#### `@mulmoclaude/core@4.7.0` — a version-only republish of 4.6.0, no code change
+
+Released 2026-09-03. The 4.6.0 publish had already landed when the release was re-run, and npm
+refuses to republish a version, so the repair is a new number rather than a re-publish of the old
+one (the same reasoning as 4.1.1). **The two are the same build**: the published tarballs are
+identical across all 452 files except the `version` string, and the tree between the tags differs
+by that one line.
+
+Nothing to do if you are already on 4.6.0. No dependency ranges move — every consumer declares a
+`^4.x` caret and converges on 4.7.0 on its own.
+
 #### `@mulmoclaude/core@4.6.0` — a custom view's staging base is decided per SLUG, not per root (#3031, PR #3032; mulmoterminal#1957, mulmoterminal#1955)
 
-Released 2026-09-03. `readSourceAwareFile` prepended the `data/skills/<slug>/` staging base for
+Released 2026-09-03. Also shipped unchanged as 4.7.0 (above). `readSourceAwareFile` prepended the `data/skills/<slug>/` staging base for
 every project-scope collection whenever the ROOT had a staging tree, without checking that the
 slug itself was staged — `stagingSkillDir(root, slug)` only answers "does this root stage" and
 then joins the slug.
