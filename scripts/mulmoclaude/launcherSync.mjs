@@ -82,36 +82,164 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
       } catch {
         continue;
       }
-      if (typeof pkg.name !== "string" || typeof pkg.version !== "string") continue;
+      // A manifest with no name cannot be referenced, so it is genuinely not a
+      // workspace. A BAD VERSION is different: dropping it here removed every
+      // consumer edge pointing at it from the audit, so a workspace with
+      // `version: 47` silently exempted all of its consumers. Keep it and let
+      // the invariants report it.
+      if (typeof pkg.name !== "string") continue;
       registry.set(pkg.name, {
         name: pkg.name,
         version: pkg.version,
         packageJsonPath: pkgPath,
         peerDependencies: pkg.peerDependencies ?? {},
         dependencies: pkg.dependencies ?? {},
+        devDependencies: pkg.devDependencies ?? {},
+        // The manifest as written. Copying three named fields is what made
+        // `optionalDependencies` invisible even after the field list was
+        // derived rather than hard-coded — the derivation was reading the
+        // copy, not the source.
+        manifest: pkg,
       });
     }
   }
   return registry;
 }
 
+// A full SemVer tail: an OPTIONAL prerelease and an OPTIONAL build, in that
+// order. The earlier `(?:[-+][\w.]*)?` allowed one or the other, so a valid
+// `4.8.0-beta.2+build.9` failed to parse — and an unparseable version yields a
+// `skipped` finding, which `main()` excludes from failure. A stale range
+// against such a version therefore walked straight through the gate.
+// SemVer 2.0.0, spelled out rather than approximated. `\d+` and `[\w.-]`
+// were close enough to look right and wrong where it counts: they accept
+// `04.7.0`, `4.7.0-01` and `4.7.0-beta_1`, all of which npm rejects — so a
+// declaration npm cannot resolve compared equal to its workspace and the
+// gate reported nothing. Numeric identifiers carry no leading zero;
+// prerelease identifiers are alphanumeric-or-hyphen (no `_`); build
+// metadata is the same set but may keep leading zeros.
+const NUM_ID = String.raw`0|[1-9]\d*`;
+const PRE_ID = String.raw`(?:${NUM_ID}|\d*[a-zA-Z-][0-9a-zA-Z-]*)`;
+const BUILD_ID = String.raw`[0-9a-zA-Z-]+`;
+const SEMVER_CORE = String.raw`(${NUM_ID})\.(${NUM_ID})\.(${NUM_ID})(?:-${PRE_ID}(?:\.${PRE_ID})*)?(?:\+${BUILD_ID}(?:\.${BUILD_ID})*)?`;
+const SEMVER_RE = new RegExp(`^${SEMVER_CORE}$`);
+// Only the comparators `satisfies()` below can actually evaluate. The old
+// `[\^~>=]*` accepted any repetition or mixture, so `====4.7.0` and `>4.7.0`
+// both read as lower bound 4.7.0 — the first is not a range npm accepts at
+// all, and the second EXCLUDES 4.7.0. Both compared equal to a workspace at
+// 4.7.0 and produced no finding.
+const COMPARATOR = String.raw`(?:\^|~|>=)?\s*`;
+const SEMVER_TAIL_RE = new RegExp(`^${COMPARATOR}${SEMVER_CORE}$`);
+const COMPARATOR_PREFIX_RE = new RegExp(`^${COMPARATOR}`);
+
 // Parse a semver range's lower bound into [major, minor, patch].
 // Handles the subset the launcher actually uses: exact ("0.4.0"),
 // caret ("^0.4.0"), tilde ("~0.4.0"), and ">=" ("^0.5.0"-style is
 // enough). Returns null for anything unrecognised so the caller can
 // skip that entry with a clear reason (URLs, git deps, "*", "next").
-function parseLowerBound(range) {
-  if (typeof range !== "string") return null;
+// `main()` drops skipped findings from the failure count, so routing an input
+// to `skipped` approves it. That makes the set deliberately CLOSED: a
+// specifier is skipped only when npm resolves it by a route that names no
+// version — the `*` wildcard, or a scheme-prefixed specifier (`workspace:`,
+// `npm:`, `file:`, `git+ssh:`, an https tarball). Anything else that fails to
+// parse is a malformed declaration and must FAIL, not slip through the same
+// door. Stating the rule this way rather than listing bad inputs is what
+// keeps `""`, `"workspacefoo"` and a non-string value out of it.
+// An ALLOW-LIST, not a pattern. `^[a-z][a-z0-9+.-]*:` looked like the same
+// idea and was not: it matched any word followed by a colon, so
+// `totally-invalid:4.6.0` was classified as a versionless route and skipped.
+// The protocols are a finite set the package managers define, so name them;
+// the malformed inputs are infinite, so never try to name those.
+const VERSIONLESS_PROTOCOLS = new Set([
+  "workspace",
+  "npm",
+  "file",
+  "link",
+  "portal",
+  "patch",
+  "git",
+  "git+ssh",
+  "git+http",
+  "git+https",
+  "git+file",
+  "http",
+  "https",
+  "github",
+  "gitlab",
+  "bitbucket",
+]);
+
+// `workspace:` is the one protocol that MAY carry a range of its own.
+// `workspace:*`, `workspace:^` and `workspace:~` are the versionless forms —
+// the package manager substitutes the local version at publish time. But
+// `workspace:^4.6.0` states a lower bound like any other range, and skipping
+// it let a stale internal dependency through. Unwrap the prefix and let the
+// normal path judge what follows.
+const WORKSPACE_PREFIX = "workspace:";
+const VERSIONLESS_WORKSPACE_FORMS = new Set(["*", "^", "~"]);
+
+const NPM_PREFIX = "npm:";
+
+// `npm:name@range` aliases the dependency to another package. When the alias
+// targets THIS SAME package it is just a range with extra ceremony —
+// `npm:@mulmoclaude/core@^4.6.0` pins core exactly as `^4.6.0` does — so it
+// must be compared, not skipped. When it targets a DIFFERENT package the
+// workspace's version says nothing about it, and skipping is correct.
+// Split on the last `@` so scoped names survive.
+function unwrapNpmAlias(trimmed, depName) {
+  const spec = trimmed.slice(NPM_PREFIX.length);
+  const at = spec.lastIndexOf("@");
+  if (at <= 0) return null;
+  return spec.slice(0, at) === depName ? spec.slice(at + 1) : null;
+}
+
+// Reduce a declared specifier to the range it states about `depName`, or
+// return it unchanged when it is not one of the protocols that can wrap one.
+function resolveSpecifier(range, depName) {
+  if (typeof range !== "string") return range;
   const trimmed = range.trim();
-  if (trimmed === "" || trimmed === "*" || trimmed.includes(":") || trimmed.startsWith("workspace")) return null;
-  const match = trimmed.match(/^[\^~>=]*\s*(\d+)\.(\d+)\.(\d+)(?:[-+][\w.]*)?$/);
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith(WORKSPACE_PREFIX)) {
+    const inner = trimmed.slice(WORKSPACE_PREFIX.length);
+    return VERSIONLESS_WORKSPACE_FORMS.has(inner) ? "*" : inner;
+  }
+  if (lower.startsWith(NPM_PREFIX)) {
+    return unwrapNpmAlias(trimmed, depName) ?? trimmed;
+  }
+  return trimmed;
+}
+
+function isVersionlessSpecifier(range) {
+  if (typeof range !== "string") return false;
+  const trimmed = range.trim();
+  if (trimmed === "*") return true;
+  const colon = trimmed.indexOf(":");
+  return colon > 0 && VERSIONLESS_PROTOCOLS.has(trimmed.slice(0, colon).toLowerCase());
+}
+
+function parseLowerBound(range) {
+  if (typeof range !== "string" || isVersionlessSpecifier(range)) return null;
+  const trimmed = range.trim();
+  const match = trimmed.match(SEMVER_TAIL_RE);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
+// The version a range pins to, in the form two of them can be compared in:
+// comparator removed and build metadata dropped, prerelease kept —
+// `^4.8.0-beta.1+build.2` → `4.8.0-beta.1`. Build metadata is excluded from
+// SemVer precedence, so two versions differing only there are the same release
+// and must not read as drift; prerelease IS part of precedence, so it stays.
+function comparableVersion(value) {
+  return String(value)
+    .trim()
+    .replace(COMPARATOR_PREFIX_RE, "")
+    .replace(/\+[\w.-]+$/, "");
+}
+
 function parseVersion(version) {
   if (typeof version !== "string") return null;
-  const match = version.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+][\w.]*)?$/);
+  const match = version.trim().match(SEMVER_RE);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
@@ -143,6 +271,107 @@ export function satisfies(version, range) {
   return v[0] === lb[0] && v[1] === lb[1] && v[2] === lb[2];
 }
 
+// Read the dependency fields OFF the manifest rather than listing them. A
+// stale range is equally wrong in all of them — `dependencies` ships it,
+// `peer` states what the host must provide, `dev` is what the package built
+// against, `optional` still resolves when present — and a hard-coded trio
+// silently exempted `optionalDependencies`, which this repo already uses.
+// Deriving them means the next field npm adds is covered on arrival.
+// `bundledDependencies` is excluded by the object test: it is an array of
+// names carrying no ranges, so there is nothing to compare.
+function dependencyFields(pkg) {
+  return Object.keys(pkg).filter((key) => /dependencies$/i.test(key) && isPlainObject(pkg[key]));
+}
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Invariant 4 owns the LOCKSTEP COMPARISON for the launcher's own
+// `dependencies` — reporting that drift twice would make one bad release read
+// as two problems. It does NOT own the strict checks: invariant 4 turns a
+// malformed range or an invalid workspace version into `skipped`, which
+// `main()` excludes from failure, so exempting the launcher outright left the
+// closed gate open for exactly the manifest the launcher owns.
+function isLockstepOwnedByInvariant4(manifestPath, field, launcherPath) {
+  return manifestPath === launcherPath && field === "dependencies";
+}
+
+// The findings invariant 4 cannot produce, and therefore must not be dropped
+// with it.
+const STRICT_KINDS = new Set(["unsupported-range", "invalid-workspace-version"]);
+
+// One consumer edge: a manifest declaring a range on a workspace
+// package. The range's lower bound MUST equal that workspace's current
+// version, for the same reason invariant 4 exists — a caret does not
+// float a consumer forward, it pins it to the lower bound, so a stale
+// range withholds every release since from anyone installing it.
+function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion }) {
+  const source = parseVersion(workspaceVersion);
+  if (!source) {
+    // Not the consumer's fault, and NOT skippable: one malformed version in a
+    // workspace's own package.json would otherwise disable this invariant for
+    // every consumer of that workspace at once.
+    return {
+      kind: "invalid-workspace-version",
+      message: `${relPath}: ${field}."${depName}" points at workspace ${depName}, whose own version "${workspaceVersion}" is not valid SemVer — no consumer of it can be verified`,
+    };
+  }
+  const specifier = resolveSpecifier(range, depName);
+  if (isVersionlessSpecifier(specifier)) {
+    return {
+      kind: "skipped",
+      message: `${relPath}: ${field}."${depName}"="${range}" resolves by a route that names no version — nothing to compare against workspace ${workspaceVersion}`,
+    };
+  }
+  const lower = parseLowerBound(specifier);
+  if (!lower) {
+    return {
+      kind: "unsupported-range",
+      message: `${relPath}: ${field}."${depName}"=${JSON.stringify(range)} is not a range this gate can evaluate — use an exact version, ^, ~ or >=`,
+    };
+  }
+  // Compare the whole lower bound, not parsed numeric triples — those are wrong
+  // in both directions: against the raw version string a correctly swept
+  // `^4.8.0-beta.1` reads as drift and blocks its own release commit, and
+  // against another triple `^4.8.0-beta.1` passes for a workspace already at
+  // `4.8.0-beta.2`, the stale range this invariant exists to find.
+  if (comparableVersion(specifier) === comparableVersion(workspaceVersion)) return null;
+  return {
+    kind: "consumer-lockstep",
+    message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) does not match workspace source ${workspaceVersion} — the lower bound must equal it, so sweep this range too`,
+  };
+}
+
+// Invariant 6: EVERY workspace manifest tracks its internal deps, not
+// just the launcher. `launcherSync` used to check the launcher alone, so
+// a release that bumped a package and swept only the launcher left every
+// plugin's peer/dev range silently stale — 14 such declarations went
+// unreported while the gate showed a single finding (#3037 / #3038).
+export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
+  const launcherPath = path.join(root, LAUNCHER_REL);
+  const manifests = [{ manifestPath: path.join(root, "package.json"), pkg: rootPkg }];
+  for (const ws of workspaces.values()) {
+    manifests.push({ manifestPath: ws.packageJsonPath, pkg: ws.manifest ?? ws });
+  }
+  const findings = [];
+  for (const { manifestPath, pkg } of manifests) {
+    const relPath = path.relative(root, manifestPath) || "package.json";
+    for (const field of dependencyFields(pkg)) {
+      const lockstepOwnedElsewhere = isLockstepOwnedByInvariant4(manifestPath, field, launcherPath);
+      for (const [depName, range] of Object.entries(pkg[field] ?? {})) {
+        const target = workspaces.get(depName);
+        if (!target || depName === pkg.name) continue;
+        const finding = checkConsumerEdge({ relPath, field, depName, range, workspaceVersion: target.version });
+        if (!finding) continue;
+        if (lockstepOwnedElsewhere && !STRICT_KINDS.has(finding.kind)) continue;
+        findings.push(finding);
+      }
+    }
+  }
+  return findings;
+}
+
 // Emit findings; each finding = { kind, message } and the caller
 // decides fail vs warn. Kinds:
 //   root-launcher-mismatch  invariant 1 — root ↔ launcher common dep range identical
@@ -150,6 +379,9 @@ export function satisfies(version, range) {
 //   peer-dep-violation      invariant 3 (#1920) — plugin peer dep satisfied by launcher pin
 //   workspace-lockstep      invariant 4 — launcher range lower bound == workspace source (strict ratchet)
 //   peer-dep-lockstep       invariant 5 — plugin peer dep lower bound major.minor == launcher pin major.minor
+//   consumer-lockstep       invariant 6 — EVERY manifest's internal dep range lower bound == workspace source
+//   unsupported-range       invariant 6 — an internal dep range this gate cannot evaluate (fails, never skips)
+//   invalid-workspace-version invariant 6 — a workspace's own version is not SemVer (fails; it blinds every consumer)
 //   skipped                 range unparseable → surface for triage
 export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
   const rootPkg = await readJson(path.join(root, "package.json"));
@@ -255,6 +487,8 @@ export async function auditLauncherSync({ root = REPO_ROOT_DEFAULT } = {}) {
     }
   }
 
+  findings.push(...auditConsumerLockstep({ root, rootPkg, workspaces }));
+
   return findings;
 }
 
@@ -263,7 +497,7 @@ export async function main() {
   const failing = findings.filter((f) => f.kind !== "skipped");
   const skipped = findings.filter((f) => f.kind === "skipped");
   if (failing.length === 0 && skipped.length === 0) {
-    console.log("[mulmoclaude:launcher-sync] OK — root ↔ launcher deps in sync, no peer-dep violations.");
+    console.log("[mulmoclaude:launcher-sync] OK — root ↔ launcher ↔ every workspace in sync, no peer-dep violations.");
     return 0;
   }
   for (const finding of failing) {
@@ -279,8 +513,10 @@ export async function main() {
   }
   console.error("");
   console.error(`[mulmoclaude:launcher-sync] ${failing.length} failing finding(s).`);
-  console.error("Bring root package.json, packages/mulmoclaude/package.json, and workspace peerDependencies");
-  console.error("into sync before merging. See #1920 for the class of bug this gate catches.");
+  console.error("Bring root package.json, packages/mulmoclaude/package.json, and EVERY workspace's");
+  console.error("dependencies / devDependencies / peerDependencies into sync before merging.");
+  console.error("See #1920 for the original class of bug, and #3037 / #3038 for the releases that");
+  console.error("swept only the launcher and left 14 plugin declarations stale.");
   return 1;
 }
 
