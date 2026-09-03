@@ -249,12 +249,19 @@ export function satisfies(version, range) {
 // tested against.
 const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies"];
 
-// Invariant 6 applies to every manifest EXCEPT the launcher's
-// `dependencies`, which invariant 4 already owns — reporting the same
-// drift twice would make one bad release look like two problems.
-function isOwnedByInvariant4(manifestPath, field, launcherPath) {
+// Invariant 4 owns the LOCKSTEP COMPARISON for the launcher's own
+// `dependencies` — reporting that drift twice would make one bad release read
+// as two problems. It does NOT own the strict checks: invariant 4 turns a
+// malformed range or an invalid workspace version into `skipped`, which
+// `main()` excludes from failure, so exempting the launcher outright left the
+// closed gate open for exactly the manifest the launcher owns.
+function isLockstepOwnedByInvariant4(manifestPath, field, launcherPath) {
   return manifestPath === launcherPath && field === "dependencies";
 }
+
+// The findings invariant 4 cannot produce, and therefore must not be dropped
+// with it.
+const STRICT_KINDS = new Set(["unsupported-range", "invalid-workspace-version"]);
 
 // One consumer edge: a manifest declaring a range on a workspace
 // package. The range's lower bound MUST equal that workspace's current
@@ -313,12 +320,14 @@ export function auditConsumerLockstep({ root, rootPkg, workspaces }) {
   for (const { manifestPath, pkg } of manifests) {
     const relPath = path.relative(root, manifestPath) || "package.json";
     for (const field of DEP_FIELDS) {
-      if (isOwnedByInvariant4(manifestPath, field, launcherPath)) continue;
+      const lockstepOwnedElsewhere = isLockstepOwnedByInvariant4(manifestPath, field, launcherPath);
       for (const [depName, range] of Object.entries(pkg[field] ?? {})) {
         const target = workspaces.get(depName);
         if (!target || depName === pkg.name) continue;
         const finding = checkConsumerEdge({ relPath, field, depName, range, workspaceVersion: target.version });
-        if (finding) findings.push(finding);
+        if (!finding) continue;
+        if (lockstepOwnedElsewhere && !STRICT_KINDS.has(finding.kind)) continue;
+        findings.push(finding);
       }
     }
   }

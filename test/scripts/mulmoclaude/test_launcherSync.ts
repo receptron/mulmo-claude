@@ -354,6 +354,21 @@ async function auditConsumerPair(coreVersion: string, consumerRange: string, fie
 
 const consumerLockstepCount = (findings: { kind: string }[]) => findings.filter((finding) => finding.kind === "consumer-lockstep").length;
 
+// The launcher declaring an internal dep directly, which is the one manifest
+// invariant 4 also inspects.
+async function auditLauncherDep(coreVersion: string, launcherRange: string) {
+  const root = makeFakeRepo({
+    root: { name: "monorepo", dependencies: {} },
+    launcher: { name: "mulmoclaude", dependencies: { "@mulmoclaude/core": launcherRange } },
+    workspaces: [{ dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: coreVersion } }],
+  });
+  try {
+    return await sync.auditLauncherSync({ root });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 describe("auditLauncherSync — invariant 6: every manifest tracks its internal deps", () => {
   // The gap #3037 / #3038 were filed for. Three releases in a row bumped a
   // workspace package and swept only the launcher; the gate reported ONE
@@ -535,6 +550,26 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
       assert.equal(findings.filter((finding) => finding.kind === "unsupported-range").length, 1, `${JSON.stringify(range)} must fail`);
       assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, `${JSON.stringify(range)} must not skip`);
     }
+  });
+
+  it("applies the strict checks to the launcher's own deps too", async () => {
+    // Invariant 4 owns the launcher's lockstep comparison, so invariant 6 used
+    // to skip that manifest entirely — which left the closed gate open for
+    // exactly the edges the launcher owns: invariant 4 turns both of these
+    // into `skipped`, and `main()` drops skipped from the failure count.
+    const malformed = await auditLauncherDep("4.7.0", "====4.7.0");
+    assert.equal(malformed.filter((finding) => finding.kind === "unsupported-range").length, 1);
+    assert.equal(malformed.filter((finding) => finding.kind !== "skipped").length > 0, true, "must fail, not merely skip");
+
+    const badVersion = await auditLauncherDep(47 as unknown as string, "^4.7.0");
+    assert.equal(badVersion.filter((finding) => finding.kind === "invalid-workspace-version").length, 1);
+  });
+
+  it("still reports launcher drift once, not twice", async () => {
+    // The reason the exemption existed. Keep it for the lockstep comparison.
+    const findings = await auditLauncherDep("4.7.0", "^4.6.0");
+    assert.equal(findings.filter((finding) => finding.kind === "workspace-lockstep").length, 1);
+    assert.equal(consumerLockstepCount(findings), 0);
   });
 
   it("evaluates a version-bearing workspace: range instead of skipping it", async () => {
