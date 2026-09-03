@@ -331,8 +331,25 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    *   - a real REGULAR FILE, judged through `realpath` so a symlink is
    *     assessed by what it points at and a directory named `deck.json` cannot
    *     masquerade as a script.
+   *
+   * The media extensions widen the same way, which is what makes the download
+   * routes able to serve an absolute script's movie / clip / PDF. That is a
+   * deliberate consequence, not an oversight: those routes sit behind the same
+   * bearer auth as every other `/api` route, and a caller holding that token
+   * can already have presentDocument read any `.md` and presentHtml any
+   * `.html`. The boundary is the token, not the directory.
    */
   function resolveAbsoluteStory(filePath: string): { ok: true; absolutePath: string } | OpFailure {
+    // `backend.byPath` is the host's OPT-IN to the absolute form, and it gates
+    // the whole of it — not just the core's read/write. Without it these ops
+    // (generation, status, probes, download) would keep serving absolute paths
+    // that the core itself refuses, so a host that never opted in would have
+    // the capability anyway through the half of the package that does not
+    // consult it (Sourcery on #3042). Refusing here restores the pre-existing
+    // behaviour EXACTLY: absolute paths were `bad_request "Invalid filePath"`.
+    if (!backend.byPath) {
+      return opBadRequest("Invalid filePath");
+    }
     if (!isAbsoluteStoryPath(filePath, STORY_TARGET_EXTENSIONS)) {
       return opBadRequest("Invalid filePath");
     }
@@ -446,6 +463,12 @@ export function createMulmoScriptServerOps(backend: MulmoScriptServerBackend) {
    * symlinks), so hosts re-assert the realpath boundary here before
    * invoking it — a symlink planted below the stories dir can't read or
    * write outside the tree (Codex P1 on MulmoClaude#2133).
+   *
+   * For an ABSOLUTE `filePath` there is no tree to stay inside — the form
+   * exists precisely to name a file elsewhere — so what this asserts there is
+   * `resolveAbsoluteStory`'s pair: the lexical shape, and a real regular file
+   * behind the realpath. The core's `locate` reaches the same verdict through
+   * `isAbsoluteStoryPath`, which is why the two are one function.
    *
    * Returns null when `filePath` isn't a non-empty string — shape
    * validation (including the script-vs-filePath mode check) belongs to

@@ -404,13 +404,16 @@ describe("resolveStory — the absolute form", () => {
 
   /** Ops whose stories dir does NOT exist and is never created: an absolute
    *  path is relative to nothing, so it must resolve without one. */
-  function makeOpsOutside(): { ops: ReturnType<typeof createMulmoScriptServerOps>; outside: string } {
+  function makeOpsOutside(opts: { byPath?: boolean } = {}): { ops: ReturnType<typeof createMulmoScriptServerOps>; outside: string } {
     const outside = mkdtempSync(path.join(tmpdir(), "mulmoscript-outside-"));
     dirs.push(outside);
     return {
       ops: createMulmoScriptServerOps({
         storiesDir: path.join(outside, "no-such-workspace", "artifacts", "stories"),
         artifacts: stubFileOps,
+        // Present by default: `byPath` is the host's opt-in to the absolute
+        // form, and these tests are about what it lets through.
+        ...(opts.byPath === false ? {} : { byPath: stubFileOps }),
         writeFileAtomic: async () => {},
       }),
       outside,
@@ -471,6 +474,19 @@ describe("resolveStory — the absolute form", () => {
     const resolved = ops.resolveStory(link);
     assert.ok(resolved.ok);
     assert.equal(resolved.absolutePath, realpathSync(real));
+  });
+
+  it("refuses an absolute path outright when the host supplied no byPath", () => {
+    // The host never opted in, so the absolute form must not exist for it —
+    // not on the core's read/write, and not on these ops either. Same
+    // bad_request the pre-`byPath` package returned for every absolute path.
+    const { ops, outside } = makeOpsOutside({ byPath: false });
+    const deck = path.join(outside, "keynote.json");
+    writeFileSync(deck, "{}");
+    const resolved = ops.resolveStory(deck);
+    assert.ok(!resolved.ok);
+    assert.equal(resolved.code, "bad_request");
+    assert.equal(resolved.error, "Invalid filePath");
   });
 
   it("is answered before the root checks — an unregistered root cannot refuse it", () => {
