@@ -14,6 +14,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 **A stdio MCP server run on the host from inside the Docker sandbox now actually reaches the agent.**
 
+### Added
+
+#### `@mulmoclaude/mulmoscript-plugin@4.6.0` — `presentMulmoScript` の `filePath` が任意の絶対パスを受ける (PR #3042)
+
+Released 2026-09-03. `filePath` は `artifacts/stories/` の中しか指せず、リポジトリに置いた
+デッキや他のツールが書いた台本は、ワークスペースにコピーしない限り開けなかった。任意の絶対
+パスの `.json` スクリプトも開けるようにした。**相対パスの意味は一切変わっていない** —
+`normalizeStoryPath` → stories ディレクトリ、byte for byte。
+
+規則は新規に発明したものではなく、`presentDocument` / `presentHtml` の `path` 引数が既に採って
+いるもの (`@mulmoclaude/core/files` の byPath ops) をそのまま踏襲する: 字句チェックのみ (NUL /
+`.` / `..` / 空セグメント / 拡張子)、封じ込めチェックは意図的に無し — 名指しされたファイルを
+開くのがこの形式の目的で、エージェントは元々そのファイルを直接読み書きできる。新しいのは view
+も読めるようになること。realpath 経由で REGULAR FILE を要求し、symlink は指す先で判断する
+(解決後の拡張子も再検査 — CWE-59)。
+
+生成物 (動画 / ビートクリップ / PDF) は mulmocast がスクリプトのディレクトリから導出する
+(`buildContext` の `basedir: path.dirname(absoluteFilePath)`) ので、絶対パスのスクリプトの出力
+はその隣に出る。stories 相対の綴りが存在しないため、ワイヤ参照も絶対パスのまま返す
+(`outputRef`) — `resolveStory` がその形をそのまま読み戻す。
+
+**ホストの opt-in が全体を制御する。** 絶対パスは `files.byPath` / `backend.byPath` を供給した
+ホストでのみ有効で、渡さないホストは 4.5.2 と同じ stories 限定動作のまま (誤解決ではなく拒否)。
+core だけがそれを見て server ops が見ていない、という半分だけの opt-in は初回レビューで潰した。
+
+`root` / `extraRoots` (#3014) には触れていない。「非デフォルト root では生成を拒否」の理由は
+`generationKey(kind, filePath, key)` が root を含まず 2 つの root の同じ*相対*パスが衝突する
+からで、絶対パスはそれ自体が `filePath` として一意なのでこの衝突は起きない。
+
+新規 export: `isAbsoluteStoryPath`, `STORY_SCRIPT_EXTENSIONS`, `STORY_TARGET_EXTENSIONS`。
+
+
 ### Fixed
 
 #### A stdio MCP server opted into `hostExecInDocker` never reached the agent (#3018, PR #3036)
