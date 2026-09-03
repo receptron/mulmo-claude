@@ -135,9 +135,11 @@ export interface McpConfigParams {
   port: number;
   activePlugins: string[];
   useDocker?: boolean;
-  // User-defined MCP servers from <workspace>/config/mcp.json.
-  // Keys become the server id in the generated --mcp-config file;
-  // values are the standard Claude CLI server spec (HTTP or stdio).
+  // User-defined MCP servers, AFTER `prepareUserServers`. Keys become
+  // the server id in the generated --mcp-config file. Users may only
+  // write `http` / `stdio` (`isMcpServerSpec` rejects the rest), but a
+  // prepared value may also be `sse` — the host-exec shim rewrites an
+  // opted-in stdio entry to the gateway it started (#3018).
   userServers?: Record<string, PreparedMcpServerSpec>;
   /** The turn's already-resolved broker, so this config and the turn's
    *  `broker=` log line describe the same one. See `resolveBrokerSpawn`. */
@@ -582,8 +584,11 @@ export function userServerAllowedToolNames(userServers: Record<string, PreparedM
   const names: string[] = [];
   for (const [serverId, spec] of Object.entries(userServers)) {
     if (spec.enabled === false) continue;
-    // Stdio servers are dropped under Docker because the sandbox
-    // image is too minimal to run most of them (see #162).
+    // This reads the PREPARED map, so a `hostExecInDocker` server has
+    // already become `sse` and MUST stay allow-listed — it runs on the
+    // host behind a gateway, not in the sandbox. Only entries still
+    // typed `stdio` here were never shimmed, and those can't run in the
+    // sandbox image (see #162 / #3018).
     if (spec.type === "stdio" && useDocker) continue;
     names.push(`mcp__${serverId}`);
   }

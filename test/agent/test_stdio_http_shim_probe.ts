@@ -66,9 +66,15 @@ describe("shim readiness probe (#3018)", () => {
   });
 
   it("reports not-ready when nothing is listening", async () => {
-    // Port 1 is reserved and never served; a failed probe must be false
-    // (caller drops the server) rather than throwing.
-    assert.equal(await probeShimReady(1), false);
+    // Take a real port, then give it back, so the probe targets one the
+    // OS just confirmed free — rather than assuming some fixed port is
+    // unused on the host. A failed probe must return false (the caller
+    // drops the server) rather than throw.
+    const { server, port } = await startFakeGateway();
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+    assert.equal(await probeShimReady(port), false);
   });
 
   it("probes a different path than the one it advertises", () => {
