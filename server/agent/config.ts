@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Role } from "../../src/config/roles.js";
 import { mcpTools, isMcpToolEnabled } from "./mcp-tools/index.js";
 import { getActiveToolDescriptors } from "./activeTools.js";
-import type { EffortLevel, McpServerSpec } from "../system/config.js";
+import type { EffortLevel, McpServerSpec, PreparedMcpServerSpec } from "../system/config.js";
 import { startStdioHttpShim, type ShimHandle } from "./stdioHttpShim.js";
 import { claudeConfigDir, claudeConfigJson } from "../utils/claudeConfigPath.js";
 import { getCurrentToken } from "../api/auth/token.js";
@@ -138,7 +138,7 @@ export interface McpConfigParams {
   // User-defined MCP servers from <workspace>/config/mcp.json.
   // Keys become the server id in the generated --mcp-config file;
   // values are the standard Claude CLI server spec (HTTP or stdio).
-  userServers?: Record<string, McpServerSpec>;
+  userServers?: Record<string, PreparedMcpServerSpec>;
   /** The turn's already-resolved broker, so this config and the turn's
    *  `broker=` log line describe the same one. See `resolveBrokerSpawn`. */
   broker?: BrokerSpawn;
@@ -187,19 +187,26 @@ function prepareUserStdioServer(spec: Extract<McpServerSpec, { type: "stdio" }>,
 }
 
 export interface PreparedUserServers {
-  servers: Record<string, McpServerSpec>;
+  servers: Record<string, PreparedMcpServerSpec>;
   /** Host-side stdio→HTTP gateways started for opted-in servers
    *  (#1421 Phase B). The caller MUST `close()` each one when the
    *  agent turn ends, or host processes / ports leak. */
   shims: ShimHandle[];
 }
 
+/** Starts the host-side gateway for an opted-in stdio server.
+ *  Injectable so the success path can be covered without spawning a
+ *  real host process — the mislabelled transport in #3018 shipped
+ *  because only the drop paths were reachable from a test. */
+export type StartShim = typeof startStdioHttpShim;
+
 // Async because the opt-in stdio→HTTP path spawns a host gateway and
-// waits for it to listen before the spec can be rewritten to http.
+// waits for it to listen before the spec can be rewritten to sse.
 export async function prepareUserServers(
   userServers: Record<string, McpServerSpec>,
   useDocker: boolean,
   hostWorkspacePath: string,
+  startShim: StartShim = startStdioHttpShim,
 ): Promise<PreparedUserServers> {
   // Drop catalog-known entries that are missing required config (#1352).
   // The dedup cache inside `logPreflightResult` keeps per-agent-run
@@ -207,7 +214,7 @@ export async function prepareUserServers(
   // missing → ok.
   const preflight = preflightUserServers(userServers);
   logPreflightResult(preflight, "agent-run");
-  const out: Record<string, McpServerSpec> = {};
+  const out: Record<string, PreparedMcpServerSpec> = {};
   const shims: ShimHandle[] = [];
   for (const [serverId, spec] of Object.entries(preflight.ready)) {
     if (spec.enabled === false) continue;
@@ -226,10 +233,17 @@ export async function prepareUserServers(
     // stdio↔HTTP gateway and rewrites the spec to http so the
     // sandboxed agent can still reach it.
     if (spec.hostExecInDocker === true) {
-      const shim = await startStdioHttpShim(serverId, spec, hostWorkspacePath);
+      const shim = await startShim(serverId, spec, hostWorkspacePath);
       if (shim) {
         shims.push(shim);
-        out[serverId] = { type: "http", url: rewriteLocalhostForDocker(shim.url, useDocker) };
+        // MUST be "sse", not "http": the gateway speaks the legacy
+        // HTTP+SSE transport (supergateway defaults to it for
+        // `--stdio`), which serves GET on the stream path and POST on
+        // a separate one. Declaring "http" makes the CLI POST
+        // `initialize` to the stream path, get a 404, and register the
+        // server with zero tools — silently, because the readiness
+        // probe only ever GETs. See #3018.
+        out[serverId] = { type: "sse", url: rewriteLocalhostForDocker(shim.url, useDocker) };
         continue;
       }
       // Shim failed to come up — fall through to the safe default
@@ -534,8 +548,8 @@ export function buildMulmoclaudeServer(params: {
 // even if they pick "mulmoclaude" as the id. Drop the entry silently:
 // the UI already validates ids against the slug pattern, so this is
 // defence-in-depth.
-function excludeReservedKeys(servers: Record<string, McpServerSpec>): Record<string, McpServerSpec> {
-  const out: Record<string, McpServerSpec> = {};
+function excludeReservedKeys(servers: Record<string, PreparedMcpServerSpec>): Record<string, PreparedMcpServerSpec> {
+  const out: Record<string, PreparedMcpServerSpec> = {};
   for (const [serverId, spec] of Object.entries(servers)) {
     if (serverId === "mulmoclaude") continue;
     out[serverId] = spec;
@@ -564,7 +578,7 @@ export function buildMcpConfig(params: McpConfigParams): { mcpServers: Record<st
 // User-facing `mcp__<server>` wildcard form for --allowedTools. Enabled
 // HTTP servers always participate; stdio servers only participate when
 // we're running natively (since the sandbox image is minimal in Docker).
-export function userServerAllowedToolNames(userServers: Record<string, McpServerSpec>, useDocker: boolean): string[] {
+export function userServerAllowedToolNames(userServers: Record<string, PreparedMcpServerSpec>, useDocker: boolean): string[] {
   const names: string[] = [];
   for (const [serverId, spec] of Object.entries(userServers)) {
     if (spec.enabled === false) continue;

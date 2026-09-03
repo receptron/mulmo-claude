@@ -25,7 +25,10 @@
 //     NOT cache, so a healthy probe later writes the real verdict.
 
 import { spawn } from "node:child_process";
-import type { McpServerSpec } from "../../src/config/mcpTypes.js";
+// Server-internal: the prepared map can hold an `sse` spec produced by
+// the host-exec shim, which the front-end mirror deliberately can't
+// express (the settings UI must never offer it as a user choice).
+import type { PreparedMcpServerSpec } from "../system/config.js";
 import { log } from "../system/logger/index.js";
 
 const NPM_VIEW_TIMEOUT_MS = 5_000;
@@ -139,7 +142,7 @@ export async function checkNpmPackage(pkg: string, prober: NpmProber = defaultNp
 // Walk every enabled stdio server, extract the npx package name, and
 // log a warn for any that resolve 404. Fire-and-forget: callers ignore
 // the returned promise.
-export async function validateStdioPackages(userServers: Record<string, McpServerSpec>, prober: NpmProber = defaultNpmProbe): Promise<void> {
+export async function validateStdioPackages(userServers: Record<string, PreparedMcpServerSpec>, prober: NpmProber = defaultNpmProbe): Promise<void> {
   const checks: Promise<void>[] = [];
   for (const [serverId, spec] of Object.entries(userServers)) {
     if (spec.type !== "stdio") continue;

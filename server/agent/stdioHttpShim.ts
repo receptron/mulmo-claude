@@ -40,6 +40,40 @@ export interface ShimHandle {
 // reproducibility). Bump deliberately after reviewing the diff.
 const SUPERGATEWAY_VERSION = "3.4.3";
 
+// supergateway defaults `--outputTransport` to `sse` for `--stdio`, so
+// the gateway speaks the legacy HTTP+SSE transport: a GET stream here
+// and POSTed messages there. Both paths are passed explicitly below so
+// these constants describe the process we actually start.
+const SHIM_SSE_PATH = "/sse";
+const SHIM_MESSAGE_PATH = "/message";
+
+/** Where the agent's MCP client subscribes. The caller MUST declare
+ *  this as `type: "sse"` — calling it `http` (Streamable HTTP) makes
+ *  the client POST `initialize` to the stream path, which the gateway
+ *  404s, so the server registers with zero tools (#3018). */
+export function shimSseUrl(port: number): string {
+  return `http://127.0.0.1:${port}${SHIM_SSE_PATH}`;
+}
+
+/** Readiness target — deliberately NOT the SSE path.
+ *
+ *  supergateway's stdio→SSE gateway keeps ONE MCP `Server` and calls
+ *  `server.connect()` on every GET of the stream path. The second
+ *  connect throws "Already connected to a transport" inside an Express
+ *  handler, which is unhandled and takes the gateway down. A probe on
+ *  the stream path therefore consumes the only session the gateway
+ *  has, and the agent's connect becomes the fatal second one — the
+ *  server is unreachable and the gateway dies (#3018). Closing the
+ *  probe's stream does NOT release it: the gateway never calls
+ *  `server.close()`, so the SDK stays bound to the dead transport.
+ *
+ *  POSTing the message path without a `sessionId` answers 400 from a
+ *  route that never touches the `Server` — proof it is listening, with
+ *  the session left for the agent. */
+export function shimProbeUrl(port: number): string {
+  return `http://127.0.0.1:${port}${SHIM_MESSAGE_PATH}`;
+}
+
 const SHIM_PORT_RANGE_START = 39_100;
 const SHIM_READY_TIMEOUT_MS = 15 * ONE_SECOND_MS;
 const SHIM_READY_POLL_MS = ONE_SECOND_MS / 4;
@@ -66,15 +100,19 @@ export function buildStdioCommand(spec: McpStdioSpec): string {
 
 const SHIM_PROBE_TIMEOUT_MS = 2 * ONE_SECOND_MS;
 
-async function probeOnce(port: number): Promise<boolean> {
+/** One readiness check against a gateway on `port`. Exported so a test
+ *  can assert it leaves the gateway's single SSE session free. */
+export async function probeShimReady(port: number): Promise<boolean> {
   // Per-request timeout: a half-open TCP connection (port accepts but
   // never responds) would otherwise hang past the overall deadline.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SHIM_PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/sse`, { method: "GET", signal: controller.signal });
-    // 405 / 400 = server is up but rejects a bare GET on the SSE
-    // endpoint — that still proves the gateway is listening.
+    const res = await fetch(shimProbeUrl(port), { method: "POST", signal: controller.signal });
+    // 400 = "Missing sessionId parameter": the gateway is up and
+    // routing, which is all readiness needs. ok / 405 are kept so a
+    // gateway that answers this route differently still counts as
+    // listening rather than being dropped.
     return res.ok || res.status === 405 || res.status === 400;
   } catch {
     return false;
@@ -90,7 +128,7 @@ async function waitUntilListening(child: ChildProcess, port: number, hasSpawnFai
     // full timeout: spawn 'error' can fire after the caller's initial
     // check, so re-test the flag (and exit/signal) every iteration.
     if (hasSpawnFailed() || child.exitCode !== null || child.signalCode !== null) return false;
-    if (await probeOnce(port)) return true;
+    if (await probeShimReady(port)) return true;
     await new Promise((resolve) => setTimeout(resolve, SHIM_READY_POLL_MS));
   }
   return false;
@@ -135,7 +173,22 @@ export async function startStdioHttpShim(serverId: string, spec: McpStdioSpec, w
     return null;
   }
 
-  const child = spawn("npx", ["-y", `supergateway@${SUPERGATEWAY_VERSION}`, "--stdio", buildStdioCommand(spec), "--port", String(port)], {
+  // Paths pinned explicitly rather than relying on supergateway's
+  // defaults, so the probe and the URL handed to the agent can never
+  // drift from the routes this process actually serves.
+  const args = [
+    "-y",
+    `supergateway@${SUPERGATEWAY_VERSION}`,
+    "--stdio",
+    buildStdioCommand(spec),
+    "--port",
+    String(port),
+    "--ssePath",
+    SHIM_SSE_PATH,
+    "--messagePath",
+    SHIM_MESSAGE_PATH,
+  ];
+  const child = spawn("npx", args, {
     // Run from the chat workspace (parity with the non-Docker stdio
     // path) so relative args / config lookups resolve identically.
     cwd: workspacePath,
@@ -168,5 +221,5 @@ export async function startStdioHttpShim(serverId: string, spec: McpStdioSpec, w
   log.info("mcp-shim", "stdio→http shim ready (host-exec, escapes sandbox)", { serverId, port });
   // Loopback URL; the caller rewrites localhost→host.docker.internal
   // for the in-container MCP config.
-  return { url: `http://127.0.0.1:${port}/sse`, close };
+  return { url: shimSseUrl(port), close };
 }
