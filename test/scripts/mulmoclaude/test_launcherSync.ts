@@ -330,6 +330,30 @@ describe("auditLauncherSync — invariant 5: gui-chat-protocol peer dep lockstep
   });
 });
 
+// Invariant-6 cases all have the same shape: one workspace package, one
+// consumer declaring a range on it. Naming that shape keeps each `it` to the
+// pair of versions under test and guarantees the temp repo is always removed.
+async function auditConsumerPair(coreVersion: string, consumerRange: string, field: "peerDependencies" | "devDependencies" = "peerDependencies") {
+  const root = makeFakeRepo({
+    root: { name: "monorepo", dependencies: {} },
+    launcher: { name: "mulmoclaude", dependencies: {} },
+    workspaces: [
+      { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: coreVersion } },
+      {
+        dir: "packages/plugins/foo-plugin",
+        pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", [field]: { "@mulmoclaude/core": consumerRange } },
+      },
+    ],
+  });
+  try {
+    return await sync.auditLauncherSync({ root });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const consumerLockstepCount = (findings: { kind: string }[]) => findings.filter((finding) => finding.kind === "consumer-lockstep").length;
+
 describe("auditLauncherSync — invariant 6: every manifest tracks its internal deps", () => {
   // The gap #3037 / #3038 were filed for. Three releases in a row bumped a
   // workspace package and swept only the launcher; the gate reported ONE
@@ -423,25 +447,10 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
   });
 
   it("accepts a prerelease workspace whose consumer range already matches", async () => {
-    // `parseLowerBound` drops the `-beta.1` suffix. Comparing it against the
-    // raw version string reported a correctly-swept prerelease as drift and
-    // would block the very release commit that did the sweep.
-    const root = makeFakeRepo({
-      root: { name: "monorepo", dependencies: {} },
-      launcher: { name: "mulmoclaude", dependencies: {} },
-      workspaces: [
-        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.1" } },
-        {
-          dir: "packages/plugins/foo-plugin",
-          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.8.0-beta.1" } },
-        },
-      ],
-    });
-    try {
-      assert.deepEqual(await sync.auditLauncherSync({ root }), []);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    // Parsing drops the `-beta.1` suffix; comparing that against the raw
+    // version string reported a correctly-swept prerelease as drift and would
+    // block the very release commit that did the sweep.
+    assert.deepEqual(await auditConsumerPair("4.8.0-beta.1", "^4.8.0-beta.1"), []);
   });
 
   it("flags a DIFFERENT prerelease with the same numeric tuple", async () => {
@@ -449,45 +458,30 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     // makes `^4.8.0-beta.1` look synchronized with a workspace already at
     // `4.8.0-beta.2` — precisely the stale lower bound this invariant exists
     // to catch, waved through.
-    const root = makeFakeRepo({
-      root: { name: "monorepo", dependencies: {} },
-      launcher: { name: "mulmoclaude", dependencies: {} },
-      workspaces: [
-        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.2" } },
-        {
-          dir: "packages/plugins/foo-plugin",
-          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.8.0-beta.1" } },
-        },
-      ],
-    });
-    try {
-      const findings = await sync.auditLauncherSync({ root });
-      assert.equal(findings.filter((finding) => finding.kind === "consumer-lockstep").length, 1);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    assert.equal(consumerLockstepCount(await auditConsumerPair("4.8.0-beta.2", "^4.8.0-beta.1")), 1);
+  });
+
+  it("reads a prerelease-plus-build version rather than skipping it", async () => {
+    // `4.8.0-beta.2+build.9` is valid SemVer, but the old suffix pattern
+    // allowed a prerelease OR a build, not both. It parsed as nothing, the
+    // edge became `skipped`, and `main()` drops skipped from the failure
+    // count — so a stale range against such a version passed the gate.
+    const findings = await auditConsumerPair("4.8.0-beta.2+build.9", "^4.8.0-beta.1+build.9");
+    assert.equal(findings.filter((finding) => finding.kind === "skipped").length, 0, "a valid SemVer version must not be skipped");
+    assert.equal(consumerLockstepCount(findings), 1, "and the stale range must be reported");
+  });
+
+  it("treats versions differing only in build metadata as the same release", async () => {
+    // Build metadata is excluded from SemVer precedence, so these resolve to
+    // the same release and reporting drift would be a false positive.
+    assert.deepEqual(await auditConsumerPair("4.8.0-beta.1+build.2", "^4.8.0-beta.1+build.1"), []);
   });
 
   it("still flags a prerelease workspace the consumer has not caught up with", async () => {
-    // The leniency above must not swallow real drift: only the numeric
-    // components are compared, so 4.7.0 vs 4.8.0-beta.1 is still a finding.
-    const root = makeFakeRepo({
-      root: { name: "monorepo", dependencies: {} },
-      launcher: { name: "mulmoclaude", dependencies: {} },
-      workspaces: [
-        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.1" } },
-        {
-          dir: "packages/plugins/foo-plugin",
-          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.7.0" } },
-        },
-      ],
-    });
-    try {
-      const findings = await sync.auditLauncherSync({ root });
-      assert.equal(findings.filter((finding) => finding.kind === "consumer-lockstep").length, 1);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    // The leniency above must not swallow real drift: the whole
+    // comparator-stripped version is compared, so 4.7.0 vs 4.8.0-beta.1 is
+    // still a finding.
+    assert.equal(consumerLockstepCount(await auditConsumerPair("4.8.0-beta.1", "^4.7.0")), 1);
   });
 
   it("surfaces an unparseable consumer range as skipped, never as a failure", async () => {

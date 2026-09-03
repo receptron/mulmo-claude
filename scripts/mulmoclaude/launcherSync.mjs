@@ -96,6 +96,15 @@ export async function loadWorkspacePackages({ root = REPO_ROOT_DEFAULT } = {}) {
   return registry;
 }
 
+// A full SemVer tail: an OPTIONAL prerelease and an OPTIONAL build, in that
+// order. The earlier `(?:[-+][\w.]*)?` allowed one or the other, so a valid
+// `4.8.0-beta.2+build.9` failed to parse — and an unparseable version yields a
+// `skipped` finding, which `main()` excludes from failure. A stale range
+// against such a version therefore walked straight through the gate.
+const SEMVER_CORE = String.raw`(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?(?:\+[\w.-]+)?`;
+const SEMVER_RE = new RegExp(`^${SEMVER_CORE}$`);
+const SEMVER_TAIL_RE = new RegExp(String.raw`^[\^~>=]*\s*${SEMVER_CORE}$`);
+
 // Parse a semver range's lower bound into [major, minor, patch].
 // Handles the subset the launcher actually uses: exact ("0.4.0"),
 // caret ("^0.4.0"), tilde ("~0.4.0"), and ">=" ("^0.5.0"-style is
@@ -105,22 +114,26 @@ function parseLowerBound(range) {
   if (typeof range !== "string") return null;
   const trimmed = range.trim();
   if (trimmed === "" || trimmed === "*" || trimmed.includes(":") || trimmed.startsWith("workspace")) return null;
-  const match = trimmed.match(/^[\^~>=]*\s*(\d+)\.(\d+)\.(\d+)(?:[-+][\w.]*)?$/);
+  const match = trimmed.match(SEMVER_TAIL_RE);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-// The version a range pins to, comparator removed and nothing else
-// normalised — `^4.8.0-beta.1` → `4.8.0-beta.1`.
-function stripComparator(range) {
-  return String(range)
+// The version a range pins to, in the form two of them can be compared in:
+// comparator removed and build metadata dropped, prerelease kept —
+// `^4.8.0-beta.1+build.2` → `4.8.0-beta.1`. Build metadata is excluded from
+// SemVer precedence, so two versions differing only there are the same release
+// and must not read as drift; prerelease IS part of precedence, so it stays.
+function comparableVersion(value) {
+  return String(value)
     .trim()
-    .replace(/^[\^~>=]*\s*/, "");
+    .replace(/^[\^~>=]*\s*/, "")
+    .replace(/\+[\w.-]+$/, "");
 }
 
 function parseVersion(version) {
   if (typeof version !== "string") return null;
-  const match = version.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+][\w.]*)?$/);
+  const match = version.trim().match(SEMVER_RE);
   if (!match) return null;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
@@ -176,13 +189,12 @@ function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion })
   if (!lower || !source) {
     return { kind: "skipped", message: `${relPath}: ${field}."${depName}"="${range}" unparseable — cannot verify vs workspace ${workspaceVersion}` };
   }
-  // Compare the FULL lower bound, prerelease and build metadata included —
-  // only the comparator is stripped. Comparing parsed numeric triples instead
-  // is wrong in both directions: against the raw version string a correctly
-  // swept `^4.8.0-beta.1` reads as drift and blocks its own release commit,
-  // and against another triple `^4.8.0-beta.1` passes for a workspace already
-  // at `4.8.0-beta.2`, which is the stale range this invariant exists to find.
-  if (stripComparator(range) === workspaceVersion.trim()) return null;
+  // Compare the whole lower bound, not parsed numeric triples — those are wrong
+  // in both directions: against the raw version string a correctly swept
+  // `^4.8.0-beta.1` reads as drift and blocks its own release commit, and
+  // against another triple `^4.8.0-beta.1` passes for a workspace already at
+  // `4.8.0-beta.2`, the stale range this invariant exists to find.
+  if (comparableVersion(range) === comparableVersion(workspaceVersion)) return null;
   return {
     kind: "consumer-lockstep",
     message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,
