@@ -164,10 +164,15 @@ function isOwnedByInvariant4(manifestPath, field, launcherPath) {
 // range withholds every release since from anyone installing it.
 function checkConsumerEdge({ relPath, field, depName, range, workspaceVersion }) {
   const lower = parseLowerBound(range);
-  if (!lower) {
+  const source = parseVersion(workspaceVersion);
+  if (!lower || !source) {
     return { kind: "skipped", message: `${relPath}: ${field}."${depName}"="${range}" unparseable — cannot verify vs workspace ${workspaceVersion}` };
   }
-  if (lower.join(".") === workspaceVersion) return null;
+  // Compare parsed components on BOTH sides, exactly as invariant 4 does.
+  // `parseLowerBound` drops prerelease/build metadata, so comparing it to the
+  // raw version string reports a correctly-swept prerelease (workspace
+  // `4.8.0-beta.1` vs range `^4.8.0-beta.1`) as drift and blocks the release.
+  if (lower.every((part, index) => part === source[index])) return null;
   return {
     kind: "consumer-lockstep",
     message: `${relPath}: ${field}."${depName}"="${range}" (lower bound ${lower.join(".")}) is behind workspace source ${workspaceVersion} — sweep this range too`,

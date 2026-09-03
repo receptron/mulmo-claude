@@ -422,6 +422,50 @@ describe("auditLauncherSync — invariant 6: every manifest tracks its internal 
     }
   });
 
+  it("accepts a prerelease workspace whose consumer range already matches", async () => {
+    // `parseLowerBound` drops the `-beta.1` suffix. Comparing it against the
+    // raw version string reported a correctly-swept prerelease as drift and
+    // would block the very release commit that did the sweep.
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: {} },
+      workspaces: [
+        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.1" } },
+        {
+          dir: "packages/plugins/foo-plugin",
+          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.8.0-beta.1" } },
+        },
+      ],
+    });
+    try {
+      assert.deepEqual(await sync.auditLauncherSync({ root }), []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("still flags a prerelease workspace the consumer has not caught up with", async () => {
+    // The leniency above must not swallow real drift: only the numeric
+    // components are compared, so 4.7.0 vs 4.8.0-beta.1 is still a finding.
+    const root = makeFakeRepo({
+      root: { name: "monorepo", dependencies: {} },
+      launcher: { name: "mulmoclaude", dependencies: {} },
+      workspaces: [
+        { dir: "packages/core", pkg: { name: "@mulmoclaude/core", version: "4.8.0-beta.1" } },
+        {
+          dir: "packages/plugins/foo-plugin",
+          pkg: { name: "@mulmoclaude/foo-plugin", version: "1.0.0", peerDependencies: { "@mulmoclaude/core": "^4.7.0" } },
+        },
+      ],
+    });
+    try {
+      const findings = await sync.auditLauncherSync({ root });
+      assert.equal(findings.filter((finding) => finding.kind === "consumer-lockstep").length, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("surfaces an unparseable consumer range as skipped, never as a failure", async () => {
     const root = makeFakeRepo({
       root: { name: "monorepo", dependencies: {} },
