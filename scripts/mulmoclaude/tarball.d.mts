@@ -79,6 +79,11 @@ export function computeFirstPartyClosure(packages: { name: string; deps: string[
  *  to exercise the Windows shape from a POSIX host. */
 export function toFileSpecifier(tarballPath: string, sep?: string): string;
 
+/** The tarball filename out of `npm pack --json` stdout, across every output
+ *  shape npm emits (array, flat object, object keyed by package name), or
+ *  `null` when the payload carries none. */
+export function packFilenameFrom(stdout: string): string | null;
+
 export interface PackWorkspaceOverridesOptions {
   root: string;
   packDir: string;
