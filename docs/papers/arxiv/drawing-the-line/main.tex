@@ -116,10 +116,10 @@ The line goes between the second part and the third. Above the line are the view
 \draw[arr] (below) -- node[above, lab, yshift=1pt] {projected} (enf);
 \node[lab, left=0.5cm of above] {free};
 \node[lab, left=0.5cm of below] {bounded};
-\node[draw, dashed, gray, inner xsep=26pt, inner ysep=8pt, fit=(above)(below), label={[lab, gray]above:written by the AI --- untrusted}] {};
-\node[draw, dashed, gray, inner sep=8pt, fit=(enf), label={[lab, gray, align=center]above:platform --- trusted\\ compiler, ruleset, hosting}] {};
+\node[draw, dashed, gray, inner xsep=26pt, inner ysep=8pt, fit=(above)(below), label={[lab, gray]above:written by the AI}] {};
+\node[draw, dashed, gray, inner sep=8pt, fit=(enf), label={[lab, gray, align=center]above:platform\\ compiler, ruleset, hosting}] {};
 \end{tikzpicture}
-\caption{The line. The AI's freedom differs on the two sides. The page above can only ask, through five intents; the declaration below decides, and it decides through enforcement that neither the page nor the AI can bypass. Everything the AI writes is untrusted; what is trusted is the platform that reads the declaration (\S\ref{sec:projection}).}
+\caption{The line. The AI's freedom differs on the two sides. The page above can only ask, through five intents; the declaration below decides, and it decides through enforcement that neither the page nor the AI can bypass.}
 \label{fig:line}
 \end{figure}
 
