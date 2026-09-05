@@ -634,6 +634,11 @@ Claude はチャット会話からユーザーの永続的な事実を自動的�
 | [Sandbox Credentials](docs/sandbox-credentials.md) | Docker サンドボックスの資格情報フォワーディング (SSH、GitHub CLI) |
 | [Logging](docs/logging.md)                         | ログレベル、フォーマット、ファイルローテーション                  |
 | [CHANGELOG](docs/CHANGELOG.md)                     | リリース履歴                                                      |
+## Windows 11 インストールガイド
+
+Windows 11をご利用の方は、次のガイドをご覧ください。
+
+- [Windows 11でMulmoClaudeを30分で動かす完全ガイド](docs/windows11-install-ja.md)
 
 ## ライセンス
 

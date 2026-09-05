@@ -621,8 +621,3 @@ Die vollständige Dokumentation befindet sich unter [`docs/`](docs/README.md). H
 ## Lizenz
 
 MIT — siehe [LICENSE](LICENSE).
-## インストールガイド
-
-Windows 11をご利用の方は、次のガイドをご覧ください。
-
-- [Windows 11でMulmoClaudeを30分で動かす完全ガイド](docs/windows11-install-ja.md)
