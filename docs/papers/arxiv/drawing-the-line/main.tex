@@ -77,7 +77,7 @@ The change of author is what changes the design of the language below the line. 
 
 The contributions are:
 \begin{itemize}
-\item The line: risk-proportional freedom for one AI author, with the view and UI controller above it and the model and business logic below, so that the generated page is untrusted and the generated declaration is not (\S\ref{sec:line}).
+\item The line: risk-proportional freedom for one AI author, with the view and UI controller above it and the model and business logic below, so that the generated page is untrusted and the generated declaration is bounded and mechanically checkable (\S\ref{sec:line}).
 \item The closed interface across the line: a small set of intents, so that the freedom above the line is genuinely free because nothing above it is consulted when a request is judged (\S\ref{sec:above}).
 \item Enforcement that outlives the author's machine and binds strangers, including ones who bypass the page, because the declaration is projected onto a system outside anything the AI wrote (\S\ref{sec:language}, \S\ref{sec:instance}).
 \item The properties the language below the line must have for the above to hold, and the argument that such a language is a harness in itself (\S\ref{sec:language}).
@@ -140,7 +140,7 @@ A language for programmers competes on expressiveness. It should let a skilled p
 
 A language for an AI competes on something else: on how much can be known about a program before it runs, by someone who did not write it and will not read it. The author is not a person to be trusted and empowered but a process to be bounded. That reverses several instincts.
 
-\paragraph{The vocabulary is closed.} There is a finite list of things that can be said, and nothing else. There is no escape hatch, no general-purpose expression, no way to compute. The absence of a way out is the point: every program in the language is drawn from a set whose members are known, and a checker that understands each member understands every program.
+\paragraph{The vocabulary is closed.} There is a finite list of things that can be said, and nothing else. There is no escape hatch, no general-purpose expression, no way to compute. The absence of a way out is the point: every program in the language is composed entirely of sentence forms whose semantics and permitted combinations are known to the checker, and there is no construct by which sentences compose into something the checker has not seen.
 
 \paragraph{Each sentence has one meaning.} A declaration is read by the AI that writes it, by the checker that validates it, by the enforcement system that projects it, and, when something is refused, by the person who wants to know why. It is written with one meaning so that all four read the same thing. \texttt{sealed: ["closed"]} means that a record in the closed state cannot be deleted, by anyone, including the owner; it does not mean anything else, and there is nothing in it to be interpreted.
 
@@ -159,7 +159,7 @@ This is why the instincts reverse. An escape hatch would be an unbounded region 
 \section{Above the Line: Freedom with a Closed Interface}
 \label{sec:above}
 
-If the language below the line is closed, the code above it must be genuinely free, or the line has bought nothing. The freedom is real: the page is ordinary HTML, CSS and JavaScript, and the AI writes it as it would write any page. What makes that freedom safe is the interface across the line.
+If the language below the line is closed, the code above it must be genuinely free, or the line has bought nothing. The freedom is real: the page is ordinary HTML, CSS and JavaScript, and the AI writes it as it would write any page. What prevents that freedom from extending to the data is the interface across the line.
 
 The interface is a small set of \emph{intents}. A page may submit a new record, move an existing record to another state, hand a record to a named person, withdraw a record, or correct the fields of a record it is allowed to correct. Five verbs. Three of them cannot name a field at all; the two that carry values are bounded by the declaration, which lists which fields a submitter may set and which are frozen. There is no sixth verb, and there is no way for the page to write to the data other than through these five.
 
