@@ -30,8 +30,9 @@ second paper. It should be posted first so the second can cite its arXiv id.
 
 ```bash
 brew install tectonic        # one-time; self-contained LaTeX, no TeX Live
-./dsls-as-harnesses/build.sh # -> dsls-as-harnesses/main.pdf
-./drawing-the-line/build.sh  # -> drawing-the-line/main.pdf
+./dsls-as-harnesses/build.sh       # -> dsls-as-harnesses/main.pdf
+./workspace-is-the-agent/build.sh  # -> workspace-is-the-agent/main.pdf
+./drawing-the-line/build.sh        # -> drawing-the-line/main.pdf
 ```
 
 Source layout per paper: `main.tex` + `refs.bib` + `build.sh`. Submit the **TeX
