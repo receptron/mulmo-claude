@@ -14,10 +14,13 @@ artifact with a technical contribution are unaffected.
 |---|---|---|---|
 | `dsls-as-harnesses/` | DSLs as Harnesses: Declarative Applications-as-Data as a Reliability Substrate for LLM Agents | `dsl-as-harness.md` + `collections-architecture.md` | cs.AI / cs.SE, cs.PL, cs.HC |
 | `workspace-is-the-agent/` | The Workspace Is the Self-Improving Agent | `workspace-is-the-agent.md` + `software-for-one.md` | cs.AI / cs.SE, cs.HC, cs.CY |
+| `drawing-the-line/` | The Harness Is the Language: When Everyone Writes Software and No One Reads It | new (shared apps; deck `mag2/Sep2026/08.json`) | cs.AI / cs.SE, cs.PL, cs.HC |
 
 **Primary category is cs.AI for both.** Endorsement is category-specific, and the
 endorser (Yohei Nakajima) is qualified in cs.AI — so cs.AI primary is friction-free;
 cs.SE/cs.PL/cs.HC are cross-lists, which need no separate endorsement.
+
+`drawing-the-line/` is the third paper. It does NOT cite the pilot (unpublished, private); it shares the pilot's verified `refs.bib` and cites Yohei Nakajima's "The Log is the Agent" (arXiv:2605.21997) directly.
 
 `dsls-as-harnesses/` is the **pilot**, drafted end-to-end as the template for the
 second paper. It should be posted first so the second can cite its arXiv id.

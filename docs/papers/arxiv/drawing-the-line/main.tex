@@ -1,0 +1,308 @@
+\documentclass[11pt]{article}
+
+% --- packages (same set as the pilot paper, dsls-as-harnesses) ----------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\definecolor{codebg}{gray}{0.96}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{gray!40},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  aboveskip=1em,
+  belowskip=1em,
+}
+
+\title{\textbf{The Harness Is the Language:\\ When Everyone Writes Software and No One Reads It}}
+
+\author{
+  Satoshi Nakajima\\
+  \small The Singularity Society\\
+  \small \texttt{satoshi@singularitysociety.org}
+}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+\let\thefootnote\relax\footnotetext{\copyright\ 2026 Satoshi Nakajima. This work is
+licensed under a Creative Commons Attribution 4.0 International (CC BY 4.0) license:
+\url{https://creativecommons.org/licenses/by/4.0/}.}
+
+\begin{abstract}
+Most software is written for many people and used many times, and every practice we have for making it safe assumes that scale. A growing share of software is now written for one person, or for a few dozen, and used for a week or a season and then set aside; it exists because an AI can write it in minutes, and it is only worth writing because writing it is nearly free. Such software has no budget for review and no budget for a second version, and if the AI that wrote it is trusted with everything, then everything the AI gets wrong is shipped.
+
+We propose a single design move for this class of software: draw a line through the application and let the AI's freedom differ on either side. Above the line sit the view and the UI controller, the part that decides what to show and what to ask for; there the AI writes ordinary code with no restriction. Below the line sit the model and the business logic, the schema, the state transitions, the permissions, and the integrity of the data; there the AI does not write imperative code, which is hard to verify. It writes a \emph{declaration} in a small language whose vocabulary is finite and whose every sentence has one meaning, and the declaration is checked mechanically and enforced outside anything the AI wrote. Code above the line can only \emph{ask}; the declaration below it \emph{decides}.
+
+The language below the line is a programming language designed for an AI rather than for a programmer. Where a language for people competes on expressiveness, a language for an AI competes on what can be verified about a program before it runs. This makes the language itself the harness: instead of inspecting what the AI produced, or confining it at run time, the language settles in advance what the AI is able to say.
+
+We present the principle, the properties such a language must have, and one instance: a platform on which twenty-six shared web applications have been produced from prompts alone, with no line of declaration or page edited by hand, from surveys and booking sheets to a public forum where AI agents argue under rules that none of them, nor their host, can break. We report how the language's vocabulary grew under use, what the line protects, and what it deliberately does not.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Software engineering is organised around a denominator. A program is expensive to write, so it must be used by enough people, enough times, to pay for itself; every practice that keeps software safe---code review, test suites, staged deployment, on-call rotation---is affordable only because that denominator is large. Call the number of people who will ever use a program its~$N$. Almost everything we know about building software well was learned at large~$N$.
+
+Large language models have changed the cost side of that equation. A working web application that would have taken a developer a week can now be produced in an afternoon by someone who has never written code, by describing it to an AI. That does not make large-$N$ software cheaper by much: the cost of that software was never mostly in the writing. What it does is make a new kind of software possible: software with a small~$N$. A sign-up sheet for one workshop. A booking form for one gym class. A survey for one talk, answered by eighty people over a weekend and then forgotten. Such software could not exist before, because no one could justify writing it. Now it can be written for the cost of asking.
+
+Small-$N$ software has properties that large-$N$ software does not. It has no budget for review: nobody is going to read the code of a form that eighty people will use for a weekend. It has no budget for a second version: if it is wrong, nobody is coming back to fix it, and the people who used it have already been served wrong. And it is written by an AI whose author, very often, cannot read what was written. So the question of how much to trust the AI is not a matter of taste. Whatever the AI is trusted with, it is trusted with completely, because nothing else is looking.
+
+Two answers are current. One is to trust the AI with everything and manage the consequences afterwards: generate tests, run static analysis, have a second AI review the first, wrap the result in a sandbox and a permission prompt. The other is to trust it with nothing that matters, and confine it to producing what a person could have produced with a form builder. The first answer inspects the output of a process that was allowed to produce anything; the second forbids the process from producing much. Neither is a good fit for software that has no second version and no reader.
+
+This paper proposes a third answer, and it is a single move: \emph{draw a line}. Split the application into the part where the AI's errors are cheap and the part where they are not, and let the AI's freedom differ on the two sides. Above the line, the AI writes code as it pleases. Below the line, it writes in a language built so that what the AI can say is exactly what can be checked: a declaration, not a procedure. The line is not a boundary between two components of a program. It is a boundary between two \emph{policies} for one AI.
+
+The contributions are:
+\begin{itemize}
+\item The principle of the line: risk-proportional freedom for an AI author, with the view and UI controller above it and the model and business logic below (\S\ref{sec:line}).
+\item The properties of a programming language for an AI, as distinct from one for programmers, and the argument that such a language is a harness in itself (\S\ref{sec:language}).
+\item The closed interface across the line, through which code above can only ask (\S\ref{sec:above}).
+\item An instance: a platform on which twenty-six shared applications were built and published from prompts alone, and a record of how the language's vocabulary grew under that use (\S\ref{sec:instance}).
+\item An honest account of what the line protects and what it leaves alone (\S\ref{sec:limits}).
+\end{itemize}
+
+\section{Drawing the Line}
+\label{sec:line}
+
+Consider a program as four parts, following the classical separation. The \emph{view} draws the screen. The \emph{UI controller} decides what the screen shows next and what the user is being asked to do. The \emph{model} holds the data and its shape. The \emph{business logic} decides what the data is allowed to become: which records may exist, who may create them, which state follows which, and what may never be undone.
+
+An error in each part costs a different amount. A view that draws a button in the wrong colour is noticed and forgiven. A controller that shows the confirmation screen before the form is annoying. A model that lets two people book the same seat, or a business rule that lets a stranger delete somebody else's record, is not an inconvenience; it is a breach, and in small-$N$ software there is no one to catch it. The four parts differ not in how hard they are to write but in how much a mistake in them costs.
+
+The line goes between the second part and the third. Above the line are the view and the UI controller: everything about \emph{what to show and what to ask}. Below it are the model and the business logic: everything about \emph{what is true and what is permitted}.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.7\linewidth}{\centering
+\vspace{4pt}
+\textbf{above the line} --- view, UI controller\\
+\emph{what to show, what to ask} --- the AI writes code freely\\[6pt]
+\rule{0.6\linewidth}{0.8pt}\\[6pt]
+\textbf{below the line} --- model, business logic\\
+\emph{what is true, what is permitted} --- the AI writes a declaration\\
+\vspace{4pt}}}
+\caption{The line. The AI's freedom differs on the two sides; the interface across it is closed.}
+\label{fig:line}
+\end{figure}
+
+Two policies then follow. Above the line, the AI is free. It writes the page in whatever language and style it likes, draws whatever it wants, and arranges the screens as it sees fit. No check is run on this code beyond the ordinary ones, and none is needed, because nothing this code does can change what is true below the line. If it is wrong, the page looks wrong.
+
+Below the line, the AI is not free. What it writes there is not a procedure, which is hard to verify, but a \emph{declaration}: a document in a small language with a fixed vocabulary, saying what the records are, who may write them, how their state moves, and what holds them together. The declaration is checked mechanically before anything is published, and once published it is enforced by a system that neither the page nor the AI that wrote the declaration can reach around.
+
+What connects the two sides is the crucial design decision. Code above the line cannot reach into the data. It can only \emph{ask}: submit this, move this record to that state, hand this row to that person, withdraw this. What it can ask for is a small closed set of intents, and whether any request is honoured is decided entirely by the declaration. The page proposes; the declaration disposes. In this way the freedom above the line is genuinely free---the AI can write anything, and it does not matter, because the worst a page can do is ask for something that will be refused.
+
+This is what distinguishes the line from ordinary layering. A layered architecture separates concerns so that people can work on them independently; every layer is still code, written by the same kind of author under the same trust. The line separates \emph{trust}. The two sides are written by the same AI in the same session, and the difference between them is what the AI is permitted to produce. Above, anything. Below, only sentences the language can check.
+
+\section{Below the Line: A Programming Language for AI}
+\label{sec:language}
+
+The declaration below the line is a program, and the language it is written in is a programming language. But it is a programming language designed for a different author, and that changes what the language is for.
+
+A language for programmers competes on expressiveness. It should let a skilled person say what they mean concisely, compose small things into large ones, and reach for the general case when they need it. Escape hatches are a virtue: when the language cannot express something, a programmer wants a way out.
+
+A language for an AI competes on something else: on how much can be known about a program before it runs, by someone who did not write it and will not read it. The author is not a person to be trusted and empowered but a process to be bounded. That reverses several instincts.
+
+\paragraph{The vocabulary is closed.} There is a finite list of things that can be said, and nothing else. There is no escape hatch, no general-purpose expression, no way to compute. The absence of a way out is the point: every program in the language is drawn from a set whose members are known, and a checker that understands each member understands every program.
+
+\paragraph{Each sentence has one meaning.} A declaration is read by the AI that writes it, by the checker that validates it, by the enforcement system that projects it, and, when something is refused, by the person who wants to know why. It is written with one meaning so that all four read the same thing. \texttt{sealed: ["closed"]} means that a record in the closed state cannot be deleted, by anyone, including the owner; it does not mean anything else, and there is nothing in it to be interpreted.
+
+\paragraph{Refusal returns to the declaration.} When an operation is refused at run time, the reason is a sentence of the declaration: this move is not in the transition table; this record refers to one that is no longer open; this field was stamped by the server and cannot be rewritten. The person who asked can be told which sentence refused them, and it is a sentence they can read. This is only possible because the language is closed: an arbitrary program refuses for arbitrary reasons.
+
+\paragraph{The declaration is independent of its enforcement.} A declaration says what must hold, not how it is checked. It names no database, no rule engine, no server. The same declaration may be projected onto whatever will enforce it, and what a given target can enforce is a property of the target, not of the language. The instance in \S\ref{sec:instance} projects onto one particular rules engine; another projection could go elsewhere, and the declaration would not change.
+
+\paragraph{Enforcement lies outside what the AI wrote.} A declaration says what must hold; something else holds it. That something is not the page, not the AI, and not any code either of them produced: it is a system that reads the declaration and refuses what the declaration does not allow, wherever the request came from. Without this the closed vocabulary would be a convention, and a page that chose to ignore it would be free to. With it, the freedom above the line is safe because nothing above the line is consulted when a request is judged.
+
+\paragraph{Checking is exhaustive and happens before publication.} Because the vocabulary is closed, the checker can ask every question it has about every declaration: does every referenced collection exist, is every field named in the write list a field that may be written by a stranger, does every state named in a transition exist, does the identity of a record depend on something the submitter controls. A declaration that fails is refused before it is published, and the reason is again a sentence.
+
+Together, these properties make the language a \emph{harness}. The word is usually applied to what surrounds an AI: the sandbox it runs in, the tests run on its output, the reviewer that reads its work, the prompt that asks it to be careful. All of these operate on a process that was allowed to produce anything, and try to contain what it produced. A closed language operates earlier. It decides what the AI is able to produce, so that the question of containing it does not arise. Below the line there is nothing to contain, because nothing the AI can write there is capable of the errors the other harnesses exist to catch.
+
+This is why the instincts reverse. An escape hatch would be an unbounded region inside the harness. A general expression would be a program the checker cannot finish reading. A sentence with two meanings would be a refusal that cannot be explained. What makes the language poor for a programmer is exactly what makes it a harness for an AI.
+
+\section{Above the Line: Freedom with a Closed Interface}
+\label{sec:above}
+
+If the language below the line is closed, the code above it must be genuinely free, or the line has bought nothing. The freedom is real: the page is ordinary HTML, CSS and JavaScript, and the AI writes it as it would write any page. What makes that freedom safe is the interface across the line.
+
+The interface is a small set of \emph{intents}. A page may submit a new record, move an existing record to another state, hand a record to a named person, withdraw a record, or correct the fields of a record it is allowed to correct. Five verbs. Three of them cannot name a field at all; the two that carry values are bounded by the declaration, which lists which fields a submitter may set and which are frozen. There is no sixth verb, and there is no way for the page to write to the data other than through these five.
+
+Each intent is a request, not an action. The page says what it would like; the parent that hosts it forwards the request; the enforcement system decides. A page that asks to reopen a closed topic is refused, and the refusal returns a sentence of the declaration. The page can then say whatever it likes about the refusal, but it cannot get around it, because it has no other way in.
+
+The page is also confined in the ordinary way---it runs in an isolated frame with no network of its own, no forms, no pop-ups, no way to reach the host it is embedded in except through the intent channel---but this confinement is secondary. Its purpose is to make the intent channel the \emph{only} channel. Once that is so, the question ``is this page safe?'' has a short answer: it can ask for five things, and every one of them is decided elsewhere.
+
+Two consequences follow for how such a page is written, and they are worth stating because they are where a freely written page most often goes wrong. First, a page should draw only from the state it is given, never from what it remembers having asked for: a submission that was cancelled, or refused, must not be drawn as if it succeeded, and the only way to guarantee that is to draw from the data. Second, a page cannot know whether an intent will be honoured, only ask; so the capabilities the page is told it has---which transitions this viewer may perform, which fields are frozen---come from the declaration, and a page that draws controls from anywhere else draws controls that do not work. Neither of these is a rule the platform enforces on the page. They are how a page has to be written when it can only ask.
+
+\section{One Instance}
+\label{sec:instance}
+
+The line has been drawn in one system, the shared-app platform of MulmoTerminal, an open-source terminal for AI coding agents.\footnote{\url{https://github.com/receptron/mulmoterminal}; the declaration compiler is the \texttt{@receptron/sharedapp} package and the enforcement rules live in the companion server repository.} It is a platform for \emph{shared apps}, small web applications built inside an AI coding session and published to a URL, where they are used by people who never see the code. The author describes what they want; the AI writes the page (above the line) and the declaration (below it); a tool checks the declaration and projects it onto the security rules of a hosted document database; and the result is a page that keeps working after the author's machine is gone.
+
+Between 14 August and 1 September 2026 this platform produced twenty-six such apps, every one of them from prompts alone: no declaration and no page was edited by hand. They are listed in Table~\ref{tab:apps}. None of them is large: the longest declaration is 157 lines of JSON, the shortest 20, and the median 65. The pages are ordinary HTML and are about seven times larger than the declarations they sit on. The apps were written by four different language models\footnote{Claude, Codex, Grok and Gemini; several directories are named for the model that wrote them.} in the same declaration language, which is the first thing to note about a closed vocabulary: it is a contract with whichever model is on the other side, and nothing in it is specific to one.
+
+\begin{table}[t]
+\caption{Twenty-six shared apps, grouped by what they are for. The vocabulary column names the declaration sentences that carry each group's business logic.}
+\label{tab:apps}
+\small
+\begin{tabular}{@{}lrp{9cm}@{}}
+\toprule
+kind & apps & below-the-line vocabulary \\
+\midrule
+survey, sign-up, quiz & 5 & \texttt{submitOnly}, \texttt{idFrom}, \texttt{stampField} \\
+live poll & 3 & \texttt{transitions} (draft/open/closed), \texttt{keyFields}, \texttt{live} \\
+booking with slots & 4 & \texttt{window.fromField}, \texttt{mirror}, \texttt{selfDelete} \\
+task board with roster & 5 & \texttt{uidField}, \texttt{idIn}, \texttt{selfTransitions} \\
+forum, chat, council & 4 & \texttt{refIn}, \texttt{sealed}, \texttt{writerDelete}, \texttt{agents} \\
+publishing (articles) & 3 & \texttt{idFrom: slug}, \texttt{selfUpdate}, \texttt{maxBytes} \\
+volunteer roster & 1 & \texttt{transitions} (registered/invited/declined) \\
+members only & 1 & (no public block) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The declaration}
+
+A declaration is one JSON document. It names the app, lists its members and their roles, and then, for each collection of records, says three things: how a record's state moves, what holds records together, and what strangers may do. The forum in which AI agents argue a question posed by a human host is nine lines below the line:
+
+\begin{lstlisting}
+"collections": {
+  "topics": {
+    "statusField": "status",
+    "transitions": { "initial": ["open"], "open": ["closed"] },
+    "sealed": ["closed"]
+  },
+  "messages": {
+    "statusField": "status",
+    "transitions": { "initial": ["posted"] },
+    "refIn": {
+      "ref": "topicId", "collection": "topics",
+      "where": { "field": "status", "equals": "open" }
+    }
+  }
+}
+\end{lstlisting}
+
+Read as sentences: a topic starts open and may become closed; nothing follows closed, so a closed topic cannot be reopened; a closed topic is sealed, so nobody, the owner included, can delete it; a message may be posted only into a topic that is currently open. Every agent at the table signs in with the host's own identity, so nothing about \emph{who} they are prevents them from reopening a topic or posting to a closed one. What prevents it is that the declaration has no sentence that allows it, and the enforcement refuses what the declaration does not allow.
+
+The rest of the document is of the same kind. \texttt{members} maps addresses to one of five roles (owner, editor, viewer, participant, assignee), app-wide or per collection. \texttt{public.submit} says, per collection, what a stranger may create: which sign-in is required (\texttt{auth}), which field their address or uid lands in (\texttt{emailField}, \texttt{uidField}), how the record's identity is formed (\texttt{idFrom}: one per person, one per person per referenced record, or unconstrained), which field the server stamps with its own clock (\texttt{stampField}), which status the record is born in (\texttt{initialStatus}), and the closed list of fields the stranger may set (\texttt{createFields}). \texttt{views} lists the pages and, for each, which audience may open it and which collections it is handed. \texttt{agents}, when present, says in prose what an AI sitting at this app is expected to do; it is guidance, not a rule, and the rules are what bind it.
+
+There is no other kind of sentence. In particular there is no expression, no conditional beyond \texttt{where}, no arithmetic, and no way to name a function. A declaration that needs to say something the vocabulary lacks cannot say it, and the platform's answer is to extend the vocabulary (\S\ref{sec:growth}), never to open an escape hatch.
+
+\subsection{Projection and enforcement}
+\label{sec:projection}
+
+A tool on the author's machine reads the declaration, checks it, and compiles it into two things: a projection stored beside the data, from which the published pages learn what they may ask for; and a set of security rules that the database evaluates on every write. After publication the author's machine is not consulted for anything. A stranger writing to the database directly, bypassing the page entirely, meets the same rules as the page does.
+
+This is where the platform pays for the properties of \S\ref{sec:language}. Every check the tool performs on the author's machine is, by construction, a diagnostic and not a guarantee, because the author's machine is not in the execution path. A guarantee is only what the rules hold. So the platform's own design principles require that any condition on which safety depends be expressed in the rules, and that the tool's checks be understood as a way of failing early rather than as enforcement. The distinction is written down, and the current gaps between the two lists are known (\S\ref{sec:limits}).
+
+The rules engine is a particular target with particular properties: it evaluates one write at a time, it can read a bounded number of other documents while doing so, it cannot count or aggregate, and each evaluation has a fixed budget of expressions. Several sentences of the vocabulary exist in the shape they do because of this target. A booking's capacity is not declared as a number, because the rules cannot count bookings; instead the \texttt{stampField} orders requests by server time and the page reports a ranking. Exclusivity is declared through record identity (\texttt{idFrom}) rather than through a uniqueness check, because a write can be refused for colliding with an existing id but not for failing a query. These are properties of the projection, and a projection onto a target that can count would let the same declaration say more.
+
+\subsection{How the vocabulary grew}
+\label{sec:growth}
+
+The vocabulary was not designed in advance. It grew over eighteen days, and every sentence in it was added because a real app could not be said without it. The record is in the platform's commit history; Table~\ref{tab:growth} gives the order.
+
+\begin{table}[t]
+\caption{Vocabulary added in August 2026, and the app that could not be said without it.}
+\label{tab:growth}
+\small
+\begin{tabular}{@{}lp{10cm}@{}}
+\toprule
+sentence & what could not be said before \\
+\midrule
+\texttt{assignee} + \texttt{assigneeField} & the stylist approves \emph{their own} bookings, not a colleague's \\
+\texttt{selfDelete} & a person withdraws and the place opens \\
+\texttt{mirror} / \texttt{mirrorOf} & a slot shows as taken without reading who took it \\
+\texttt{transitions} (draft/open/closed) & a live poll closes one question before opening the next \\
+\texttt{uidField} & a board names who holds a task without publishing their address \\
+\texttt{idIn} & a claim's identity is the task's, so a task is held once \\
+\texttt{agents[]} & an AI sitting at the app is told its job by the app \\
+\texttt{refIn} & no message into a topic that is not open \\
+\texttt{sealed} & a closed topic cannot be deleted, by anyone \\
+\texttt{correct} + \texttt{frozen} & an article gets a typo fixed without becoming a second article \\
+\texttt{maxBytes} & a body has a size the page is told before sending \\
+\texttt{ownRead} & a participant's page is handed only their own rows \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three things about this growth matter for the argument.
+
+First, at every step the vocabulary stayed closed. Each addition is a sentence with one meaning, checked by the tool and enforced by the rules, and none of them is a way to write a procedure. The temptation to add an escape hatch---``just let the declaration contain a predicate''---arose more than once and was refused each time, because a single predicate would have made the checker unable to finish reading any declaration that used it.
+
+Second, additions came in pairs of a sentence and a refusal. \texttt{refIn} arrived with the rule that refuses the write; \texttt{sealed} arrived with the rule that refuses the delete; \texttt{correct} arrived with the list of fields that are \emph{frozen} and the rule that refuses a write to them. A sentence that the rules could not enforce was not added, and where a sentence could be checked by the tool but not held by the rules, it was documented as a diagnostic.
+
+Third, some additions made the pages \emph{simpler}. \texttt{ownRead} is the clearest case: before it, a participant's page received every row and had to find its own, and a page that found the wrong one showed somebody else's data. After it, the page receives only its own rows, and the mistake cannot be written. Moving a decision below the line removed code from above it.
+
+\subsection{What the author sees}
+
+Whether the author can program is beside the point; what matters is that they do not. The author of one of these apps sees a conversation. They say what they want; the AI says what it has made, in the author's words (``people can sign up now''; ``I closed it so nobody can add to it''); and the author is shown the page running, in a preview that exercises it against the declaration without writing anything, before it is published. The author does not see the declaration unless they ask, does not see the rules at all, and is never asked to read a line of the page.
+
+What the author \emph{does} see is refusals. When the AI writes a declaration the checker will not accept---a public form with no sign-in, a field in the write list that a stranger must not set, a role that grants nothing because a required field is missing---the refusal is reported in terms of the declaration, and the AI reports it in terms of the app. This is the only point at which the line is visible to the author, and it is visible as a sentence: not ``rule 47 failed'' but ``a stranger could then set the status of their own booking''.
+
+\section{What the Line Does Not Protect}
+\label{sec:limits}
+
+
+The line protects what is true and what is permitted. It does not protect the experience.
+
+\paragraph{The page can be wrong.} Everything above the line is free, and that includes the freedom to draw the wrong screen. A page may show a form to someone who has already answered, or thank someone for a record that was refused. The data is untouched by either mistake, which is the point, but the person using the page is not. The platform mitigates this with a preview that runs the page before it is published, and with guidance on how to write a page that can only ask; it does not, and by design cannot, verify the page. Drawing the line means accepting this. What is protected is chosen, and what is not protected is chosen too.
+
+\paragraph{Identity handed over cannot be bound.} The declaration decides what a given identity may do. It cannot decide what happens when one identity is shared. In the forum above, every AI agent signs in as the host; the declaration binds all of them exactly as it binds the host, which is why closing a topic holds, but it cannot tell one agent from another, and so cannot give them different rights. This is a limit of identity, not of the line.
+
+\paragraph{The projection may be incomplete.} Some checks that belong below the line are, in the current instance, performed only on the author's machine: that a roster keeps at least one owner, for example. Such a check is a diagnostic rather than a guarantee, and the principle says it should be moved into the enforcement target. Where this has not yet been done, it is a gap in the projection, not in the language.
+
+\paragraph{What a target cannot enforce, the declaration cannot promise.} The instance projects onto a rules engine that evaluates one write at a time and cannot count. So a declaration cannot say ``at most twenty places'' and have it hold; it can only order the requests by a server-stamped time and let the page report the ranking. This is a property of the projection target, and a different target would lift it. It is listed here so that the limit is not mistaken for a limit of the line.
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Declarative authorization.} Writing what is permitted as data rather than code is old: XACML~\cite{oasis2013xacml} for enterprise policy, Cedar~\cite{cutler2024cedar} for cloud services, and the rules languages of hosted databases~\cite{firebase2026rules}, one of which is our projection target. The declaration below the line is authorization in this sense, and it deliberately reuses such an engine rather than building one. The difference is in what the language is written in and by whom. Those languages are addressed to a policy author and speak of principals, resources and actions; ours is addressed to an AI writing on behalf of somebody who wants a booking sheet, and speaks of places, opening times, closing a topic and sealing it. That vocabulary is what allows the AI to write it from a description of the app, and what allows a refusal to be reported in the app's own terms.
+
+\paragraph{End-user programming and low-code.} The end-user software engineering literature~\cite{ko2011enduser} asks how people who are not programmers can make software that is nonetheless correct, and the low-code industry answers with composition in a GUI. Both assume the person composes. Here the AI composes and the person describes, which moves the safety question: it is no longer whether the person can be led to a correct composition but whether the AI can be prevented from an incorrect one. The closed language is our answer, and it is one a form builder does not need, because a form builder's user cannot write a predicate either way.
+
+\paragraph{Harnesses for generated code.} The usual response to code an AI has written is to check it afterwards or confine it while it runs: generated tests, static analysis, a linter on every edit~\cite{yang2024sweagent}, a second model as reviewer, sandboxes, permission prompts. All of these accept that the AI may have produced anything and try to find out what. The line does not replace them above it---the page is still confined in the ordinary way---but below it the question they answer does not arise, because the AI could not have produced anything other than a declaration. The nearest relative is grammar-constrained decoding~\cite{willard2023outlines,beurerkellner2023lmql,openai2024structured}, which bounds what a model can emit at the token level. Our bound is semantic rather than syntactic: not that the output parses, but that every sentence of it means one checkable thing.
+
+\paragraph{Where the authority lives.} A related question is which artifact an agentic system treats as authoritative. \citet{ynakajima2026log} makes it an append-only event log, and obtains replay and cheap forking from that choice; the agent's behaviour is whatever the log, replayed, produces. Here the authoritative artifact is the declaration, and the records are ordinary state judged one write at a time. The two agree on the point that matters for the line: authority is placed in something that is not the model and not the code the model wrote. They differ in what that something is. A log is authoritative about what \emph{happened}; a declaration is authoritative about what \emph{may}. Several of our collections are in practice append-only---a survey's responses, a forum's messages, where nothing is ever rewritten and one corrects oneself by posting again, ordered by a server-stamped time---and those are the cases where the two designs meet.
+
+\paragraph{Capabilities.} That the page can only \emph{ask}, through a closed set of intents whose effect is decided elsewhere, is the object-capability discipline~\cite{miller2006robust} applied across the line: the page holds no authority over the data, only references to requests it may make. The declaration is what decides which of those requests are honoured for which viewer.
+
+\paragraph{Domain-specific languages.} The declaration is a DSL~\cite{mernik2005dsl,fowler2010dsl}, and the DSL literature would ask what it should be able to express. The answer here inverts the usual one. A DSL for programmers is judged by how much of its domain it can say; this one is judged by how much of what it says can be checked, and it is extended only when an app could not be said, and only by a sentence the checker and the enforcement can both hold.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Software with a small $N$ has no second version and no reader. Whatever an AI is trusted with in such software, it is trusted with completely. We have argued that the right response is neither to trust it with everything and inspect the result, nor to trust it with nothing, but to draw a line: above it, the view and the UI controller, written freely; below it, the model and the business logic, written in a language whose vocabulary is closed, whose sentences have one meaning each, whose refusals point back to a sentence, and whose enforcement lies outside anything the AI wrote. Code above the line can only ask; the declaration below it decides.
+
+Such a language is a programming language for an AI rather than for a programmer, and its value lies in what can be known about a program before it runs. That is what makes it a harness. It does not surround the AI; it settles in advance what the AI is able to say.
+
+One instance exists. Twenty-six apps were written on it from prompts alone, by four different models, in eighteen days, and the language's vocabulary grew by twelve sentences to accommodate them without once opening an escape hatch. What the line protects held; what it does not protect is stated.
+
+Three things are next. A second projection target, so that the independence of the declaration from its enforcement is demonstrated rather than claimed, and so that a target that can count lifts the limits the present one imposes. A controlled comparison of the same requests built with and without the line, counting the refusals the checker issues and the breaches that reach the data. And observation of authors who are not the platform's author, because the argument is about software that other people will now be able to have.
+
+
+\section*{Availability}
+
+MulmoTerminal, including the shared-app tooling, templates and the skill that
+drives an agent through building one, is open source at
+\url{https://github.com/receptron/mulmoterminal}. The declaration compiler is
+published as \texttt{@receptron/sharedapp} on npm. The twenty-six apps of
+\S\ref{sec:instance} are the author's own and are not all public; the forum
+of \S\ref{sec:instance} is.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}
