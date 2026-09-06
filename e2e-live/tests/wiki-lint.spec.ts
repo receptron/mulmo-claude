@@ -5,15 +5,16 @@ import { type Page, expect, test } from "@playwright/test";
 import { ONE_MINUTE_MS } from "../../server/utils/time.ts";
 import { placeWikiPage, removeWikiPage, replaceWikiIndex, restoreWikiIndex } from "../fixtures/live-chat.ts";
 
-// `/wiki/lint-report` diagnostic coverage. All five tests assert that
+// `/wiki/lint-report` diagnostic coverage. All six tests assert that
 // a specific issue category surfaces in the lint output:
-//   - L-WIKI-LINT-EMPTY-TARGET  → bare [[Japanese]] → "empty target"
+//   - L-WIKI-LINT-EMPTY-TARGET  → [[|alias]]        → "empty target"
+//   - L-WIKI-LINT-NON-ASCII     → [[日本語]]         → "<題名>.md not found"
 //   - L-WIKI-LINT-BROKEN        → [[bogus-slug]]    → "broken link"
 //   - L-WIKI-LINT-ORPHAN        → page on disk not in index.md
 //   - L-WIKI-LINT-MISSING       → index row pointing at a missing file
 //   - L-WIKI-LINT-TAG-DRIFT     → frontmatter vs index hashtag drift
 //
-// The first three never touch `data/wiki/index.md` and run in parallel.
+// The first four never touch `data/wiki/index.md` and run in parallel.
 // The last two replace `index.md` and live in a `describe.serial`
 // block so one test's restore can't race a sibling's replace.
 //
@@ -32,48 +33,79 @@ const navigateToWikiLintReport = async (page: Page): Promise<void> => {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("wiki lint diagnostics (real workspace)", () => {
-  test("L-WIKI-LINT-EMPTY-TARGET: lint レポート画面で bare [[Japanese]] が empty target 診断に出る", async ({ page }, testInfo) => {
+  test("L-WIKI-LINT-EMPTY-TARGET: lint レポート画面で [[|alias]] が empty target 診断に出る", async ({ page }, testInfo) => {
     test.setTimeout(ONE_MINUTE_MS);
-    // Covers PR #1312's new "empty target" diagnostic. Pre-fix
-    // bare `[[Japanese title]]` (or `[[#anchor]]`) collapsed via
-    // `wikiSlugify` into an empty string and was reported as a
-    // broken link to `<empty>.md`, indistinguishable from a real
-    // missing-file regression. Post-fix, the resolver detects the
-    // empty-slug case and emits `→ empty target` so operators can
-    // filter the noise apart from genuine `<slug>.md not found`.
+    // Covers PR #1312's "empty target" diagnostic. A `[[|alias]]` body
+    // has nothing before the pipe, so the target is empty and there is
+    // no slug to look up — distinct from a target that names a page
+    // which happens not to exist. Flagged separately so an author can
+    // tell a malformed link from a missing one.
     //
-    // No target page is seeded — by design the link cannot resolve.
-    // Cleanup only touches the source page.
+    // This used to seed a bare Japanese target, which collapsed to an
+    // empty slug under `wikiSlugify`. #2940 changed that on purpose —
+    // a Japanese page filename IS its slug — so that case now belongs
+    // to L-WIKI-LINT-NON-ASCII below and this one uses the shape that
+    // is still genuinely empty.
     const projectSlug = testInfo.project.name;
     const nonce = `${Date.now()}-${randomUUID().slice(0, 6)}`;
     const sourceSlug = `e2e-live-wiki-lint-empty-source-${projectSlug}-${nonce}`;
-    // Bare Japanese-only target — wikiSlugify strips every char and
-    // returns "" so the resolver has no slug to look up. Crucially
-    // the target string contains NO ASCII (no nonce, no hyphen, no
-    // digit) — any surviving ASCII would slip through wikiSlugify
-    // and become a non-empty slug, demoting the diagnostic from
-    // "empty target" back to "<slug>.md not found". Per-test
-    // uniqueness comes from `sourceSlug` (which IS nonce-stamped),
-    // so the `<li>:has-text(sourceSlug)` filter still scopes the
-    // assertion to this run only.
+    // The alias carries the nonce so the assertion scopes to this run
+    // even though the target itself is empty by construction.
+    const alias = `empty-alias-${nonce}`;
+    try {
+      await placeWikiPage(sourceSlug, [`# wiki-lint-empty source`, ``, `[[|${alias}]]`, ``].join("\n"));
+      await navigateToWikiLintReport(page);
+      // Positive: an "empty target" entry naming our source file.
+      await expect(
+        page.locator(`li:has-text("${sourceSlug}"):has-text("${alias}"):has-text("empty target")`),
+        "lint must report [[|alias]] as an empty target diagnostic",
+      ).toHaveCount(1);
+      // Negative: it must not ALSO be reported as a missing file —
+      // "<slug>.md not found" would invite creating a page for a link
+      // that names none.
+      await expect(
+        page.locator(`li:has-text("${sourceSlug}"):has-text("${alias}"):has-text("not found")`),
+        "empty-target case must not also surface as a 'not found' broken link",
+      ).toHaveCount(0);
+    } finally {
+      await removeWikiPage(sourceSlug);
+    }
+  });
+
+  test("L-WIKI-LINT-NON-ASCII: lint レポート画面で bare [[日本語]] が <題名>.md not found 診断に出る", async ({ page }, testInfo) => {
+    test.setTimeout(ONE_MINUTE_MS);
+    // Pins #2940 end to end. A page file may be NAMED in Japanese, so
+    // the stem is the slug and a missing one must read `<題名>.md not
+    // found` — actionable, because that is the file you would create.
+    // Before #2940 `wikiSlugify` stripped every character and the link
+    // was reported as an "empty target", which described the link as
+    // malformed when it was merely missing.
+    //
+    // The unit test in `packages/core/test/wiki/test_lint.ts` pins the
+    // same rule ("reports a missing non-ASCII target as a broken link,
+    // not an empty target"); this one pins that the lint REPORT shows
+    // it. No target page is seeded — by design the link cannot resolve.
+    const projectSlug = testInfo.project.name;
+    const nonce = `${Date.now()}-${randomUUID().slice(0, 6)}`;
+    const sourceSlug = `e2e-live-wiki-lint-nonascii-source-${projectSlug}-${nonce}`;
+    // ASCII-free by construction: any surviving ASCII would change the
+    // stem and blur what this test is pinning. Per-test uniqueness comes
+    // from `sourceSlug`, which the `<li>` filter scopes on.
     const bareJapaneseTarget = "日本語のみのターゲット記号終端タイトル";
     try {
-      await placeWikiPage(sourceSlug, [`# wiki-lint-empty source`, ``, `[[${bareJapaneseTarget}]]`, ``].join("\n"));
+      await placeWikiPage(sourceSlug, [`# wiki-lint-nonascii source`, ``, `[[${bareJapaneseTarget}]]`, ``].join("\n"));
       await navigateToWikiLintReport(page);
-      // Positive: the seeded link must surface as an "empty target"
-      // entry naming our source file and the bare Japanese token.
-      // Pre-fix would have produced "→ <some-ascii-tail>.md not
-      // found" instead of "→ empty target".
+      // Positive: the missing page is named verbatim, with the `.md`
+      // stem the author would create.
+      await expect(
+        page.locator(`li:has-text("${sourceSlug}"):has-text("${bareJapaneseTarget}.md"):has-text("not found")`),
+        "lint must report a missing non-ASCII target as '<題名>.md not found'",
+      ).toHaveCount(1);
+      // Negative: it must NOT be reported as an empty target — that is
+      // the pre-#2940 behaviour this test exists to prevent regressing to.
       await expect(
         page.locator(`li:has-text("${sourceSlug}"):has-text("${bareJapaneseTarget}"):has-text("empty target")`),
-        "lint must report bare Japanese-only [[…]] as empty target diagnostic",
-      ).toHaveCount(1);
-      // Negative: same source file, no "<slug>.md not found" entry
-      // for this link. If the diagnostic regressed back to broken-
-      // link reporting, this would catch it.
-      await expect(
-        page.locator(`li:has-text("${sourceSlug}"):has-text("${bareJapaneseTarget}"):has-text("not found")`),
-        "empty-target case must not also surface as a 'not found' broken link",
+        "a missing non-ASCII target must not be reported as an empty target (#2940)",
       ).toHaveCount(0);
     } finally {
       await removeWikiPage(sourceSlug);
