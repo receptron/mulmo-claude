@@ -142,6 +142,15 @@ describe("ShapeScript robustness", () => {
     assert.ok(colors.includes("ff0000"), `expected a red material, got ${colors.join(", ") || "none"}`);
   });
 
+  it("bounds a `for` inside a path, which never reaches the node budget", () => {
+    // Path commands are expanded by `buildPath` / `convertLathe`, not by
+    // `convertNode`, so `maxNodes` cannot see them — only the iteration cap can.
+    assert.throws(
+      () => astToThreeJS(parseShapeScript("extrude {\n  path {\n    for i in 1 to 10 {\n      point i 0\n    }\n  }\n}"), { maxLoopIterations: 3 }),
+      ShapeScriptLimitError,
+    );
+  });
+
   it("bounds the `for … in values` form with the same iteration budget", () => {
     // The cap used to live only in the range expansion, and the node budget
     // counts what the BODY builds — so an empty body ran the whole list free.
@@ -189,6 +198,20 @@ describe("disposeScratch", () => {
 
     assert.equal(geometryCalls(), 0, "freed the geometry the survivor draws with");
     assert.equal(materialCalls(), 0, "freed the material the survivor draws with");
+  });
+
+  it("frees the operands when CSG fails and the fallback group is returned", () => {
+    // The fallback rebuilds the children, so everything built before the
+    // failure is unreachable — and it used to skip the cleanup entirely.
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const abandoned = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+    const fallback = new THREE.Group();
+    fallback.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial()));
+    const geometryCalls = spyDispose(geometry);
+
+    disposeScratch([abandoned], fallback);
+
+    assert.equal(geometryCalls(), 1);
   });
 
   it("leaves a CSG result renderable after its operands are freed", () => {

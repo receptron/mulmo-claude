@@ -313,6 +313,13 @@ export class Converter {
     // Save the transform state BEFORE entering block - CSG result will be positioned here
     const savedMatrix = this.currentTransform().matrix.clone();
 
+    // Declared outside the try so the fallback path below can free whatever had
+    // been built before the failure. Everything in here exists only to feed the
+    // CSG evaluator — the children, their clones, the Brushes, and every
+    // intermediate `evaluate()` result — and none of it ever enters the scene,
+    // so scene teardown never reclaims it.
+    const scratch: THREE.Object3D[] = [];
+
     try {
       const csgEvaluator = new CSGEvaluator();
 
@@ -329,13 +336,7 @@ export class Converter {
       current.matrix.identity();
       current.color = undefined;
 
-      // Convert all children to meshes. `scratch` holds everything built only
-      // to feed the CSG evaluator — the children themselves, their clones, the
-      // Brushes, and every intermediate `evaluate()` result. None of it ever
-      // enters the scene, so scene teardown never reclaims it; it is freed
-      // against the surviving result at the end of this block.
       const meshes: THREE.Mesh[] = [];
-      const scratch: THREE.Object3D[] = [];
       try {
         for (const child of node.children) {
           const object = this.convertNode(child);
@@ -461,6 +462,11 @@ export class Converter {
       // Apply saved transform to fallback group
       fallbackGroup.applyMatrix4(savedMatrix);
       fallbackGroup.updateMatrixWorld(true);
+
+      // Whatever had been built before the failure is unreachable now — the
+      // fallback rebuilds the children from scratch — so free it here too.
+      // Excluded by resource again, in case any of it is shared.
+      disposeScratch(scratch, fallbackGroup);
 
       return fallbackGroup;
     }
@@ -875,16 +881,9 @@ export class Converter {
           const to = this.evaluateNumber(command.to);
           const step = command.step ? this.evaluateNumber(command.step) : 1;
 
-          const iterations: number[] = [];
-          if (step > 0) {
-            for (let i = from; i <= to; i += step) {
-              iterations.push(i);
-            }
-          } else if (step < 0) {
-            for (let i = from; i >= to; i += step) {
-              iterations.push(i);
-            }
-          }
+          // Path commands never reach `convertNode`, so `maxNodes` cannot stop
+          // this one — the shared bounded iterator is the only ceiling here.
+          const iterations = this.rangeIterations(from, to, step);
 
           for (const i of iterations) {
             this.symbols.set(command.variable, i);
@@ -981,16 +980,9 @@ export class Converter {
           const to = this.evaluateNumber(command.to);
           const step = command.step ? this.evaluateNumber(command.step) : 1;
 
-          const iterations: number[] = [];
-          if (step > 0) {
-            for (let i = from; i <= to; i += step) {
-              iterations.push(i);
-            }
-          } else if (step < 0) {
-            for (let i = from; i >= to; i += step) {
-              iterations.push(i);
-            }
-          }
+          // Path commands never reach `convertNode`, so `maxNodes` cannot stop
+          // this one — the shared bounded iterator is the only ceiling here.
+          const iterations = this.rangeIterations(from, to, step);
 
           for (const i of iterations) {
             this.symbols.set(command.variable, i);
