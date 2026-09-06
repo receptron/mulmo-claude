@@ -8,8 +8,10 @@ import { TOOL_NAME, TOOL_DEFINITION } from "./definition";
 export const presentShapeScript = async (_context: ToolContext, args: PresentShapeScriptArgs): Promise<PresentShapeScriptRenderedResult> => {
   const { script, title } = args;
 
-  // Validate that script is provided
-  if (!script || script.trim() === "") {
+  // `typeof`, not truthiness: `script` arrives straight off `req.body`, so a
+  // number or object would reach `.trim()` and throw a TypeError that surfaces
+  // as a generic 500 instead of this message.
+  if (typeof script !== "string" || script.trim() === "") {
     throw new Error("ShapeScript code is required but was not provided");
   }
 

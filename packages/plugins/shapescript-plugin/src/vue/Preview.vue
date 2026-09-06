@@ -1,6 +1,6 @@
 <template>
   <div class="preview-container" data-testid="shapescript-preview">
-    <div ref="previewViewport" class="preview-viewport"></div>
+    <div ref="previewViewport" class="preview-viewport" />
     <div class="preview-title">
       {{ displayTitle }}
     </div>
@@ -14,13 +14,17 @@ import type { ToolResult } from "gui-chat-protocol";
 import type { PresentShapeScriptData } from "../core/types";
 import { parseShapeScript } from "../shapescript/parser";
 import { astToThreeJS } from "../shapescript/toThreeJS";
+import { removeAndDispose } from "../shapescript/dispose";
+import { useT } from "../lang";
 
 const props = defineProps<{
   result: ToolResult<PresentShapeScriptData>;
 }>();
 
+const t = useT();
+
 const displayTitle = computed(() => {
-  return props.result.title || "3D Visualization";
+  return props.result.title || t.value.untitled;
 });
 
 const previewViewport = ref<HTMLDivElement | null>(null);
@@ -106,10 +110,11 @@ function reloadScene() {
   if (!scene || !props.result.data?.script) return;
 
   try {
-    // Remove old objects
-    if (sceneGroup) {
-      scene.remove(sceneGroup);
-    }
+    // Remove old objects — and free them. `scene.remove` only drops the
+    // reference; the GPU buffers live until each geometry / material is
+    // disposed, and this runs again on every script change.
+    removeAndDispose(scene, sceneGroup);
+    sceneGroup = null;
 
     // Parse and create new objects
     const ast = parseShapeScript(props.result.data.script);
@@ -124,6 +129,8 @@ function cleanup() {
   if (animationId) {
     cancelAnimationFrame(animationId);
   }
+  removeAndDispose(scene, sceneGroup);
+  sceneGroup = null;
   if (renderer) {
     renderer.dispose();
   }

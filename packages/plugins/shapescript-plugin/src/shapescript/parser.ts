@@ -191,6 +191,7 @@ class Lexer {
     const line = this.line;
     const column = this.column;
     let str = "";
+    let terminated = false;
 
     this.advance(); // consume opening quote
 
@@ -199,6 +200,7 @@ class Lexer {
 
       if (char === '"') {
         this.advance(); // consume closing quote
+        terminated = true;
         break;
       } else if (char === "\\") {
         // Handle escape sequences
@@ -219,6 +221,13 @@ class Lexer {
       } else {
         str += this.advance();
       }
+    }
+
+    // Without this the loop just runs out of input and the token swallows the
+    // rest of the file, so a missing quote renders wrong geometry instead of
+    // reporting the typo. Scripts are model-authored; the typo is likely.
+    if (!terminated) {
+      throw new ParseError(`Unterminated string literal`, line, column);
     }
 
     return {
@@ -1133,6 +1142,12 @@ export class Parser {
       const body: SceneNode[] = [];
 
       while (this.current().type !== TokenType.RBRACE && this.current().type !== TokenType.EOF) {
+        // Each `option` / body statement sits on its own line, and NEWLINE
+        // tokens now survive to the parser (they carry the case boundaries the
+        // switch form needs), so consume them here rather than handing one to
+        // `parseNode()`.
+        this.skipNewlines();
+        if (this.current().type === TokenType.RBRACE || this.current().type === TokenType.EOF) break;
         // Check for option declarations
         if (this.current().type === TokenType.OPTION) {
           this.advance(); // consume 'option'
@@ -1876,10 +1891,13 @@ export function parseShapeScript(script: string): SceneNode[] {
     const lexer = new Lexer(script);
     const tokens = lexer.tokenize();
 
-    // Filter out newline tokens for simpler parsing
-    const filteredTokens = tokens.filter((t) => t.type !== TokenType.NEWLINE);
-
-    const parser = new Parser(filteredTokens);
+    // Newlines are NOT filtered out. The parser is written to consume them —
+    // 27 `skipNewlines()` calls, and `parseSwitch` stops collecting a case's
+    // values at the line boundary — so stripping them first (as this used to,
+    // "for simpler parsing") made the unbraced `switch` form the tool
+    // definition advertises unparseable: the body and every later `case` were
+    // swallowed as values until `Expected RBRACE but got EOF`.
+    const parser = new Parser(tokens);
     return parser.parse();
   } catch (error) {
     if (error instanceof ParseError) {

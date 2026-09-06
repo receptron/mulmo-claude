@@ -17,7 +17,11 @@ name, and the `Present3D*` type names, are renamed throughout.
 | `./style.css` | the compiled component styles (Vite lib mode does not auto-inject them)                                                  |
 
 ```ts
+import type { ToolContext } from "gui-chat-protocol";
 import { executePresentShapeScript } from "@mulmoclaude/shapescript-plugin";
+
+// The handler does not read the context; the host passes its own.
+const context = {} as ToolContext;
 
 const result = await executePresentShapeScript(context, {
   title: "Circular Pattern",

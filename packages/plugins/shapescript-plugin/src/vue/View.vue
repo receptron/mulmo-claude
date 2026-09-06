@@ -1,31 +1,38 @@
 <template>
   <div class="present3d-container" data-testid="shapescript-view">
     <div class="header">
-      <h1>{{ selectedResult.title || "3D Visualization" }}</h1>
+      <h1>{{ selectedResult.title || t.untitled }}</h1>
       <div class="controls">
-        <button @click="resetCamera" class="control-btn">
+        <button class="control-btn" @click="resetCamera">
           <span class="material-icons">refresh</span>
-          Reset Camera
+          {{ t.resetCamera }}
         </button>
-        <button @click="toggleWireframe" class="control-btn">
+        <button class="control-btn" @click="toggleWireframe">
           <span class="material-icons">{{ showWireframe ? "grid_off" : "grid_on" }}</span>
-          Wireframe
+          {{ t.wireframe }}
         </button>
-        <button @click="toggleGrid" class="control-btn">
+        <button class="control-btn" @click="toggleGrid">
           <span class="material-icons">{{ showGrid ? "visibility_off" : "visibility" }}</span>
-          Grid
+          {{ t.grid }}
         </button>
       </div>
     </div>
 
-    <div v-if="parseError" class="error" data-testid="shapescript-parse-error"><strong>Parse Error:</strong> {{ parseError }}</div>
+    <div v-if="parseError" class="error" data-testid="shapescript-parse-error">
+      <strong>{{ t.parseError }}</strong> {{ parseError }}
+    </div>
 
-    <div class="viewport" ref="viewport" data-testid="shapescript-viewport"></div>
+    <div ref="viewport" class="viewport" data-testid="shapescript-viewport" />
 
     <details class="script-source">
-      <summary>Edit ShapeScript Source</summary>
-      <textarea v-model="editableScript" @input="handleScriptEdit" class="script-editor" spellcheck="false"></textarea>
-      <button @click="applyScript" class="apply-btn" :disabled="!hasChanges">Apply Changes</button>
+      <summary>{{ t.editSource }}</summary>
+      <!-- `aria-label`, because the only visible text near this control is the
+           <summary> that toggles the panel — a screen reader otherwise
+           announces an unlabelled text area. -->
+      <textarea v-model="editableScript" class="script-editor" spellcheck="false" :aria-label="t.scriptEditorLabel" @input="handleScriptEdit" />
+      <button class="apply-btn" :disabled="!hasChanges" @click="applyScript">
+        {{ t.applyChanges }}
+      </button>
     </details>
   </div>
 </template>
@@ -38,10 +45,23 @@ import type { ToolResult } from "gui-chat-protocol";
 import type { PresentShapeScriptData } from "../core/types";
 import { parseShapeScript } from "../shapescript/parser";
 import { astToThreeJS } from "../shapescript/toThreeJS";
+import { removeAndDispose } from "../shapescript/dispose";
+import { useT } from "../lang";
 
 interface CameraState {
   position?: { x: number; y: number; z: number };
   target?: { x: number; y: number; z: number };
+}
+
+/** `viewState` is rehydrated from a session's JSONL, which nothing validates on
+ *  the way in: a legacy or hand-edited entry can carry a missing axis or a
+ *  string. `camera.position.set(undefined, …)` yields NaN coordinates, and a
+ *  NaN camera renders an empty viewport with no error to explain it. */
+function readVec3(value: unknown): { x: number; y: number; z: number } | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { x, y, z } = value as Record<string, unknown>;
+  const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+  return finite(x) && finite(y) && finite(z) ? { x, y, z } : null;
 }
 
 const props = defineProps<{
@@ -51,6 +71,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   updateResult: [result: ToolResult<PresentShapeScriptData>];
 }>();
+
+const t = useT();
 
 const editableScript = ref(props.selectedResult.data?.script ?? "");
 
@@ -176,8 +198,11 @@ function handleResize() {
 
 function loadShapeScript() {
   try {
-    // Clear previous scene objects
-    sceneObjects.forEach((obj) => scene.remove(obj));
+    // Clear previous scene objects — and free them. `scene.remove` only drops
+    // the reference; the GPU buffers live until each geometry / material is
+    // disposed, and this runs again on every script edit and wireframe toggle,
+    // so the leak ends in a lost WebGL context.
+    sceneObjects.forEach((obj) => removeAndDispose(scene, obj));
     sceneObjects = [];
 
     // Parse ShapeScript into AST
@@ -222,12 +247,14 @@ function restoreCameraState() {
 
   const state = props.selectedResult.viewState.cameraState as CameraState;
 
-  if (state.position) {
-    camera.position.set(state.position.x, state.position.y, state.position.z);
+  const position = readVec3(state.position);
+  if (position) {
+    camera.position.set(position.x, position.y, position.z);
   }
 
-  if (state.target) {
-    controls.target.set(state.target.x, state.target.y, state.target.z);
+  const target = readVec3(state.target);
+  if (target) {
+    controls.target.set(target.x, target.y, target.z);
   }
 
   camera.updateProjectionMatrix();
@@ -266,6 +293,9 @@ function updateCameraState() {
   const updatedResult: ToolResult<PresentShapeScriptData> = {
     ...props.selectedResult,
     viewState: {
+      // Spread first: `viewState` is a free-form bag, so replacing it outright
+      // would drop whatever else the host or a future feature persisted there.
+      ...props.selectedResult.viewState,
       cameraState: saveCameraState(),
     },
   };
@@ -285,6 +315,8 @@ function cleanup() {
   if (cameraChangeTimeout !== null) {
     clearTimeout(cameraChangeTimeout);
   }
+  sceneObjects.forEach((obj) => removeAndDispose(scene, obj));
+  sceneObjects = [];
   if (animationId) {
     cancelAnimationFrame(animationId);
   }

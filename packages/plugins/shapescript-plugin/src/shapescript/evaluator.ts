@@ -326,7 +326,13 @@ export class Evaluator {
       }
 
       case "call": {
-        const func = builtInFunctions[expr.name.toLowerCase()];
+        // Own-property check: a plain object literal inherits `constructor`,
+        // `toString` and friends from `Object.prototype`, so `constructor()`
+        // used to resolve to a function and return an object that later
+        // coerced to `false` — a silently skipped `if` branch instead of
+        // "Unknown function".
+        const name = expr.name.toLowerCase();
+        const func = Object.prototype.hasOwnProperty.call(builtInFunctions, name) ? builtInFunctions[name] : undefined;
         if (!func) {
           throw new Error(`Unknown function: ${expr.name}`);
         }

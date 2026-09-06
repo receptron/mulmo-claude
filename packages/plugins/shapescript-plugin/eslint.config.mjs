@@ -7,6 +7,10 @@ import globals from "globals";
 
 export default [
   eslint.configs.recommended,
+  // Spread at the top level: `configs["flat/recommended"]` is an ARRAY of flat
+  // config objects in eslint-plugin-vue 10.x, so its `.rules` is undefined and
+  // spreading it into a `rules` block below would silently enable nothing.
+  ...vuePlugin.configs["flat/recommended"],
   {
     files: ["**/*.ts", "**/*.vue"],
     languageOptions: {
@@ -27,8 +31,11 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
-      ...vuePlugin.configs["flat/recommended"].rules,
       "vue/multi-word-component-names": "off",
+      // Prettier owns template formatting in this repo and wraps attributes by
+      // print width; this rule wants one per line the moment there are two, so
+      // the two rewrite each other's output forever. Off, not appeased.
+      "vue/max-attributes-per-line": "off",
     },
   },
   {

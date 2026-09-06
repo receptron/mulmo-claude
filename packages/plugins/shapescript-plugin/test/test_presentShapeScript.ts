@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 import { TOOL_NAME, TOOL_DEFINITION, executePresentShapeScript } from "../src/core/index";
 import { parseShapeScript } from "../src/shapescript/parser";
-import { astToThreeJS } from "../src/shapescript/toThreeJS";
+import { astToThreeJS, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
 
 const context = {} as Parameters<typeof executePresentShapeScript>[0];
 
@@ -69,5 +69,74 @@ describe("ShapeScript pipeline", () => {
   it("builds a CSG difference", () => {
     const group = astToThreeJS(parseShapeScript("difference {\n  sphere { size 2 }\n  sphere { size 1.7 }\n}"));
     assert.ok(group.children.length > 0);
+  });
+});
+
+// Review findings on #3052. Each of these parsed or ran WRONG before the fix,
+// which is why they are asserted rather than left to the smoke cases above.
+describe("ShapeScript robustness", () => {
+  it("parses the unbraced switch form the tool definition advertises", () => {
+    // Newlines used to be stripped before parsing, so `parseSwitch` never saw
+    // the case boundary and swallowed each body as another case value until
+    // "Expected RBRACE but got EOF".
+    const nodes = parseShapeScript("define shape 2\nswitch shape {\ncase 1\n    cube\ncase 2\n    sphere\nelse\n    cone\n}");
+    const sw = nodes.find((node) => node.type === "switch");
+    assert.equal(sw?.type, "switch");
+    assert.equal(sw?.type === "switch" ? sw.cases.length : 0, 2);
+  });
+
+  it("still parses an option-bearing custom shape definition", () => {
+    // The other side of the newline change: `define <name> { option … }` bodies
+    // are line-separated too.
+    const nodes = parseShapeScript("define spiral {\n    option coils 3\n    option radius 0.5\n    cube { size radius }\n}\nspiral");
+    assert.equal(nodes[0]?.type, "define");
+  });
+
+  it("refuses a runaway loop instead of exhausting memory", () => {
+    assert.throws(() => astToThreeJS(parseShapeScript("for i in 1 to 100000000 {\n  cube { position i 0 0 }\n}")), ShapeScriptLimitError);
+  });
+
+  it("refuses a script that produces more objects than the budget", () => {
+    assert.throws(
+      () => astToThreeJS(parseShapeScript("for i in 1 to 100 {\n  for j in 1 to 100 {\n    cube { position i j 0 }\n  }\n}"), { maxNodes: 500 }),
+      ShapeScriptLimitError,
+    );
+  });
+
+  it("does not swallow a budget refusal inside a CSG block", () => {
+    // `convertCSG` catches failures and falls back to a plain group — which
+    // would rebuild exactly the runaway the budget just refused.
+    assert.throws(
+      () => astToThreeJS(parseShapeScript("difference {\n  for i in 1 to 100 {\n    cube { position i 0 0 }\n  }\n  sphere { size 1 }\n}"), { maxNodes: 20 }),
+      ShapeScriptLimitError,
+    );
+  });
+
+  it("reports an unterminated string instead of swallowing the rest of the file", () => {
+    assert.throws(() => parseShapeScript('cube { name "unclosed\ncube { size 1 }'), /Unterminated string/);
+  });
+
+  it("refuses an inherited name rather than resolving it off Object.prototype", () => {
+    // The built-ins live in an object literal, so `constructor` / `toString`
+    // used to pass the truthiness check and return a value that quietly
+    // coerced to `false` (or to a grey material) instead of raising. Either
+    // refusal message is fine — what matters is that it refuses.
+    for (const name of ["constructor", "toString", "valueOf", "hasOwnProperty"]) {
+      assert.throws(
+        () => astToThreeJS(parseShapeScript(`define x ${name}(1)\ncube { size x }`)),
+        /Unknown function|Undefined variable/,
+        `${name} was accepted`,
+      );
+    }
+  });
+
+  it("applies a scope-level color command to a shape that has none of its own", () => {
+    const group = astToThreeJS(parseShapeScript("color 1 0 0\ncube { size 1 }"));
+    const colors: string[] = [];
+    group.traverse((object) => {
+      const material = (object as { material?: { color?: { getHexString(): string } } }).material;
+      if (material?.color) colors.push(material.color.getHexString());
+    });
+    assert.ok(colors.includes("ff0000"), `expected a red material, got ${colors.join(", ") || "none"}`);
   });
 });

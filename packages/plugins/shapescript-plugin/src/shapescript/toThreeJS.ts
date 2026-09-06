@@ -31,6 +31,31 @@ import { Evaluator, SymbolTable, Value } from "./evaluator";
 
 export interface ConversionOptions {
   wireframe?: boolean;
+  /** Hard ceiling on the objects one script may produce. See
+   *  `DEFAULT_MAX_NODES`. */
+  maxNodes?: number;
+  /** Hard ceiling on the iterations one `for` may run. See
+   *  `DEFAULT_MAX_LOOP_ITERATIONS`. */
+  maxLoopIterations?: number;
+}
+
+// Conversion runs synchronously on the browser's main thread, and the script is
+// LLM-authored — a stray `for i in 1 to 100000000` is a plausible accident, not
+// only an attack. Without a ceiling that call allocates until the tab dies, and
+// the user cannot even read the error because nothing yields. Both limits are
+// far above any legible model (the shipped samples peak in the dozens) and far
+// below what hurts: 20k meshes render, 100M do not.
+export const DEFAULT_MAX_NODES = 20_000;
+export const DEFAULT_MAX_LOOP_ITERATIONS = 100_000;
+
+/** Its own class so `convertCSG`'s fallback can rethrow it instead of swallowing
+ *  it: catching a budget error there would rebuild the same runaway children as
+ *  a plain group, which is the work the budget exists to refuse. */
+export class ShapeScriptLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ShapeScriptLimitError";
+  }
 }
 
 type TransformState = {
@@ -45,6 +70,8 @@ export class Converter {
   private evaluator: Evaluator;
   private symbols: SymbolTable;
   private detailLevel: number = 32; // Default detail level for curved shapes
+  /** Objects produced so far, checked against `maxNodes` on every node. */
+  private nodeCount = 0;
 
   // Transform state stack for relative transforms
   private transformStack: TransformState[] = [];
@@ -70,7 +97,36 @@ export class Converter {
     return group;
   }
 
+  private get maxNodes(): number {
+    return this.options.maxNodes ?? DEFAULT_MAX_NODES;
+  }
+
+  private get maxLoopIterations(): number {
+    return this.options.maxLoopIterations ?? DEFAULT_MAX_LOOP_ITERATIONS;
+  }
+
+  /** Expand a `for … from to to step` range without materialising it first.
+   *  The array used to be built up front, so an absurd bound exhausted memory
+   *  before a single node existed and the budget below never got a turn. */
+  private rangeIterations(from: number, to: number, step: number): number[] {
+    if (step === 0 || !Number.isFinite(step) || !Number.isFinite(from) || !Number.isFinite(to)) return [];
+    const iterations: number[] = [];
+    for (let i = from; step > 0 ? i <= to : i >= to; i += step) {
+      if (iterations.length >= this.maxLoopIterations) {
+        throw new ShapeScriptLimitError(`ShapeScript loop exceeds ${this.maxLoopIterations} iterations — narrow the range or increase the step`);
+      }
+      iterations.push(i);
+    }
+    return iterations;
+  }
+
   private convertNode(node: SceneNode): THREE.Object3D | null {
+    // Counted on the way IN, so a runaway loop stops at the limit rather than
+    // after building everything it asked for.
+    this.nodeCount += 1;
+    if (this.nodeCount > this.maxNodes) {
+      throw new ShapeScriptLimitError(`ShapeScript produced more than ${this.maxNodes} objects — reduce the loop counts or the nesting`);
+    }
     switch (node.type) {
       case "shape":
         return this.convertShape(node);
@@ -221,11 +277,21 @@ export class Converter {
     }
   }
 
-  private createMaterial(node: { properties: ShapeProperties }): THREE.Material {
-    const color = node.properties.color ? this.evaluateColor(node.properties.color) : [0.8, 0.8, 0.8];
-    const [red = 0.8, green = 0.8, blue = 0.8] = color;
+  private materialColor(property: ShapeProperties["color"]): THREE.Color {
+    if (property !== undefined) {
+      const [red = 0.8, green = 0.8, blue = 0.8] = this.evaluateColor(property);
+      return new THREE.Color(red, green, blue);
+    }
+    const scopeColor = this.currentTransform().color;
+    return scopeColor === undefined ? new THREE.Color(0.8, 0.8, 0.8) : scopeColor.clone();
+  }
 
-    const threeColor = new THREE.Color(red, green, blue);
+  private createMaterial(node: { properties: ShapeProperties }): THREE.Material {
+    // A per-shape `color` property wins; otherwise the enclosing scope's
+    // `color` command applies. That fallback was missing, so `color 1 0 0`
+    // followed by `cube` rendered the default grey — the scope colour was
+    // stored and cloned but never read back.
+    const threeColor = this.materialColor(node.properties.color);
 
     const opacity = node.properties.opacity ? this.evaluateNumber(node.properties.opacity) : 1;
     const transparent = opacity < 1;
@@ -253,6 +319,9 @@ export class Converter {
       // Blocks start at identity - shapes are relative to block origin
       this.symbols.pushScope();
       this.pushTransform();
+      // The matching pops live in the `finally` below, so a throw mid-collection
+      // unwinds the frames instead of leaving one behind for the fallback path
+      // (which pushes a scope of its own) to inherit.
 
       // Reset to identity for block's local coordinate space
       const current = this.currentTransform();
@@ -261,28 +330,32 @@ export class Converter {
 
       // Convert all children to meshes
       const meshes: THREE.Mesh[] = [];
-      for (const child of node.children) {
-        const object = this.convertNode(child);
-        if (object instanceof THREE.Mesh) {
-          // Clone the mesh to avoid modifying the original
-          const clonedMesh = object.clone();
-          clonedMesh.updateMatrixWorld(true);
-          meshes.push(clonedMesh);
-        } else if (object instanceof THREE.Group) {
-          // Extract meshes from group
-          object.traverse((obj) => {
-            if (obj instanceof THREE.Mesh) {
-              const clonedMesh = obj.clone();
-              clonedMesh.updateMatrixWorld(true);
-              meshes.push(clonedMesh);
-            }
-          });
+      try {
+        for (const child of node.children) {
+          const object = this.convertNode(child);
+          if (object instanceof THREE.Mesh) {
+            // Clone the mesh to avoid modifying the original
+            const clonedMesh = object.clone();
+            clonedMesh.updateMatrixWorld(true);
+            meshes.push(clonedMesh);
+          } else if (object instanceof THREE.Group) {
+            // Extract meshes from group
+            object.traverse((obj) => {
+              if (obj instanceof THREE.Mesh) {
+                const clonedMesh = obj.clone();
+                clonedMesh.updateMatrixWorld(true);
+                meshes.push(clonedMesh);
+              }
+            });
+          }
         }
+      } finally {
+        // Pop scopes - transforms and symbols. In a `finally` so a child that
+        // throws (a budget refusal, a bad expression) cannot leave the frame
+        // behind for whatever runs next.
+        this.popTransform();
+        this.symbols.popScope();
       }
-
-      // Pop scopes - transforms and symbols
-      this.popTransform();
-      this.symbols.popScope();
 
       if (meshes.length === 0) {
         return new THREE.Group();
@@ -341,7 +414,10 @@ export class Converter {
       result.updateMatrixWorld(true);
 
       return result;
-    } catch {
+    } catch (error) {
+      // A budget refusal is not a CSG failure — rebuilding the same children as
+      // a plain group would do exactly the work the budget refused.
+      if (error instanceof ShapeScriptLimitError) throw error;
       // Return original shapes as a group if CSG fails
       const fallbackGroup = new THREE.Group();
 
@@ -396,17 +472,7 @@ export class Converter {
       const to = this.evaluateNumber(node.to);
       const step = node.step ? this.evaluateNumber(node.step) : 1;
 
-      // Determine iteration direction
-      const iterations: number[] = [];
-      if (step > 0) {
-        for (let i = from; i <= to; i += step) {
-          iterations.push(i);
-        }
-      } else if (step < 0) {
-        for (let i = from; i >= to; i += step) {
-          iterations.push(i);
-        }
-      }
+      const iterations = this.rangeIterations(from, to, step);
 
       for (const i of iterations) {
         this.symbols.set(node.variable, i);
