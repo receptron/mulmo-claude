@@ -207,7 +207,14 @@ function loadShapeScript() {
 
     // Parse ShapeScript into AST
     const script = props.selectedResult.data?.script;
-    if (!script) return;
+    if (!script) {
+      // Nothing to draw is not an error, and this path is reached when a result
+      // moves from an INVALID script to a valid empty one: the scene clears, so
+      // leaving the previous parse error on screen described geometry that is
+      // no longer there.
+      parseError.value = null;
+      return;
+    }
     const ast = parseShapeScript(script);
 
     // Convert AST to Three.js objects
