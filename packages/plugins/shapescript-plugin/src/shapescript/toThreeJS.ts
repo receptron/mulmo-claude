@@ -331,10 +331,11 @@ export class Converter {
       // unwinds the frames instead of leaving one behind for the fallback path
       // (which pushes a scope of its own) to inherit.
 
-      // Reset to identity for block's local coordinate space
-      const current = this.currentTransform();
-      current.matrix.identity();
-      current.color = undefined;
+      // Reset to identity for block's local coordinate space. The MATRIX only:
+      // an enclosing `color` is not a coordinate, and clearing it made
+      // `color 1 0 0` apply to a plain `cube` but not to a `difference` beside
+      // it. `pushTransform` already cloned the inherited colour.
+      this.currentTransform().matrix.identity();
 
       const meshes: THREE.Mesh[] = [];
       try {
@@ -447,17 +448,26 @@ export class Converter {
       // Return original shapes as a group if CSG fails
       const fallbackGroup = new THREE.Group();
 
-      // Create scope for fallback
+      // Same scopes as the success path, for the same reason: the children must
+      // be built in the BLOCK's coordinate space, because `savedMatrix` — the
+      // enclosing transform — is applied to the group below. Pushing only a
+      // symbol scope left the parent transform active while converting, so it
+      // landed twice on every fallback shape.
       this.symbols.pushScope();
+      this.pushTransform();
+      this.currentTransform().matrix.identity();
 
-      for (const child of node.children) {
-        const object = this.convertNode(child);
-        if (object) {
-          fallbackGroup.add(object);
+      try {
+        for (const child of node.children) {
+          const object = this.convertNode(child);
+          if (object) {
+            fallbackGroup.add(object);
+          }
         }
+      } finally {
+        this.popTransform();
+        this.symbols.popScope();
       }
-
-      this.symbols.popScope();
 
       // Apply saved transform to fallback group
       fallbackGroup.applyMatrix4(savedMatrix);

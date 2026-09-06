@@ -142,6 +142,23 @@ describe("ShapeScript robustness", () => {
     assert.ok(colors.includes("ff0000"), `expected a red material, got ${colors.join(", ") || "none"}`);
   });
 
+  it("applies a scope-level color command to a CSG model too", () => {
+    // Entering a CSG block reset the block's colour along with its matrix. A
+    // colour is not a coordinate, so `color 1 0 0` reached a plain `cube` but
+    // not a `difference` beside it.
+    const group = astToThreeJS(parseShapeScript("color 1 0 0\ndifference {\n  sphere { size 2 }\n  sphere { size 1.7 }\n}"));
+    const colors: string[] = [];
+    group.traverse((object) => {
+      // A CSG result can carry an ARRAY of materials, one per operand.
+      const { material } = object as { material?: unknown };
+      for (const entry of Array.isArray(material) ? material : [material]) {
+        const color = (entry as { color?: { getHexString(): string } } | undefined)?.color;
+        if (color) colors.push(color.getHexString());
+      }
+    });
+    assert.ok(colors.includes("ff0000"), `expected a red CSG result, got ${colors.join(", ") || "none"}`);
+  });
+
   it("bounds a `for` inside a path, which never reaches the node budget", () => {
     // Path commands are expanded by `buildPath` / `convertLathe`, not by
     // `convertNode`, so `maxNodes` cannot see them — only the iteration cap can.
