@@ -30,6 +30,30 @@ const navigateToWikiLintReport = async (page: Page): Promise<void> => {
   await expect(page.getByTestId("wiki-page-body").getByRole("heading", { name: "Wiki Lint Report" })).toBeVisible();
 };
 
+// A nonce with NO ASCII in it. `wikiSlugify` strips every non-ASCII
+// character, so a target has to stay ASCII-free to exercise the
+// non-ASCII path at all — while still being unique per run, because a
+// fixed title could collide with a real page in the live workspace and
+// silently resolve, making the "not found" row we assert on disappear
+// (Sourcery on #3053). 16 CJK numerals, one per hex digit, keeps the
+// UUID's entropy rather than folding it.
+const CJK_HEX_ALPHABET = "〇一二三四五六七八九十百千万億兆";
+
+const cjkNonce = (length = 10): string =>
+  Array.from(randomUUID().replace(/-/g, "").slice(0, length), (hexDigit) => CJK_HEX_ALPHABET[Number.parseInt(hexDigit, 16)] ?? "〇").join("");
+
+// Seed a source page whose only content is one wiki link. Every lint
+// test below needs exactly this, and pulling it out keeps the test
+// bodies at the level of "what is asserted".
+const seedSourceWithLink = async (sourceSlug: string, heading: string, linkBody: string): Promise<void> => {
+  await placeWikiPage(sourceSlug, [`# ${heading}`, ``, `[[${linkBody}]]`, ``].join("\n"));
+};
+
+const hasText = (token: string): string => `:has-text("${token}")`;
+
+/** A lint-report `<li>` scoped to one source page, matching every token. */
+const lintEntry = (page: Page, sourceSlug: string, ...tokens: string[]) => page.locator(`li${hasText(sourceSlug)}${tokens.map(hasText).join("")}`);
+
 test.describe.configure({ mode: "parallel" });
 
 test.describe("wiki lint diagnostics (real workspace)", () => {
@@ -46,27 +70,20 @@ test.describe("wiki lint diagnostics (real workspace)", () => {
     // a Japanese page filename IS its slug — so that case now belongs
     // to L-WIKI-LINT-NON-ASCII below and this one uses the shape that
     // is still genuinely empty.
-    const projectSlug = testInfo.project.name;
     const nonce = `${Date.now()}-${randomUUID().slice(0, 6)}`;
-    const sourceSlug = `e2e-live-wiki-lint-empty-source-${projectSlug}-${nonce}`;
+    const sourceSlug = `e2e-live-wiki-lint-empty-source-${testInfo.project.name}-${nonce}`;
     // The alias carries the nonce so the assertion scopes to this run
     // even though the target itself is empty by construction.
     const alias = `empty-alias-${nonce}`;
     try {
-      await placeWikiPage(sourceSlug, [`# wiki-lint-empty source`, ``, `[[|${alias}]]`, ``].join("\n"));
+      await seedSourceWithLink(sourceSlug, "wiki-lint-empty source", `|${alias}`);
       await navigateToWikiLintReport(page);
       // Positive: an "empty target" entry naming our source file.
-      await expect(
-        page.locator(`li:has-text("${sourceSlug}"):has-text("${alias}"):has-text("empty target")`),
-        "lint must report [[|alias]] as an empty target diagnostic",
-      ).toHaveCount(1);
+      await expect(lintEntry(page, sourceSlug, alias, "empty target"), "lint must report [[|alias]] as an empty target diagnostic").toHaveCount(1);
       // Negative: it must not ALSO be reported as a missing file —
       // "<slug>.md not found" would invite creating a page for a link
       // that names none.
-      await expect(
-        page.locator(`li:has-text("${sourceSlug}"):has-text("${alias}"):has-text("not found")`),
-        "empty-target case must not also surface as a 'not found' broken link",
-      ).toHaveCount(0);
+      await expect(lintEntry(page, sourceSlug, alias, "not found"), "empty-target case must not also surface as a 'not found' broken link").toHaveCount(0);
     } finally {
       await removeWikiPage(sourceSlug);
     }
@@ -85,26 +102,25 @@ test.describe("wiki lint diagnostics (real workspace)", () => {
     // same rule ("reports a missing non-ASCII target as a broken link,
     // not an empty target"); this one pins that the lint REPORT shows
     // it. No target page is seeded — by design the link cannot resolve.
-    const projectSlug = testInfo.project.name;
-    const nonce = `${Date.now()}-${randomUUID().slice(0, 6)}`;
-    const sourceSlug = `e2e-live-wiki-lint-nonascii-source-${projectSlug}-${nonce}`;
-    // ASCII-free by construction: any surviving ASCII would change the
-    // stem and blur what this test is pinning. Per-test uniqueness comes
-    // from `sourceSlug`, which the `<li>` filter scopes on.
-    const bareJapaneseTarget = "日本語のみのターゲット記号終端タイトル";
+    const sourceSlug = `e2e-live-wiki-lint-nonascii-source-${testInfo.project.name}-${Date.now()}-${randomUUID().slice(0, 6)}`;
+    // ASCII-free AND unique: any surviving ASCII would change the stem
+    // and blur what this pins, while a FIXED title could match a real
+    // page in the live workspace, resolve, and take the "not found" row
+    // with it.
+    const bareJapaneseTarget = `日本語のみのターゲット${cjkNonce()}`;
     try {
-      await placeWikiPage(sourceSlug, [`# wiki-lint-nonascii source`, ``, `[[${bareJapaneseTarget}]]`, ``].join("\n"));
+      await seedSourceWithLink(sourceSlug, "wiki-lint-nonascii source", bareJapaneseTarget);
       await navigateToWikiLintReport(page);
       // Positive: the missing page is named verbatim, with the `.md`
       // stem the author would create.
       await expect(
-        page.locator(`li:has-text("${sourceSlug}"):has-text("${bareJapaneseTarget}.md"):has-text("not found")`),
+        lintEntry(page, sourceSlug, `${bareJapaneseTarget}.md`, "not found"),
         "lint must report a missing non-ASCII target as '<題名>.md not found'",
       ).toHaveCount(1);
       // Negative: it must NOT be reported as an empty target — that is
       // the pre-#2940 behaviour this test exists to prevent regressing to.
       await expect(
-        page.locator(`li:has-text("${sourceSlug}"):has-text("${bareJapaneseTarget}"):has-text("empty target")`),
+        lintEntry(page, sourceSlug, bareJapaneseTarget, "empty target"),
         "a missing non-ASCII target must not be reported as an empty target (#2940)",
       ).toHaveCount(0);
     } finally {
