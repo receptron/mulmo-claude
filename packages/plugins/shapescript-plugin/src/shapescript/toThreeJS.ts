@@ -28,7 +28,7 @@ import {
   ShapeProperties,
 } from "./types";
 import { Evaluator, SymbolTable, Value } from "./evaluator";
-import { disposeScratch } from "./dispose";
+import { disposeObject3D, disposeScratch } from "./dispose";
 
 export interface ConversionOptions {
   wireframe?: boolean;
@@ -192,25 +192,40 @@ export class Converter {
     }
   }
 
-  private convertBlock(node: { children: SceneNode[] }): THREE.Group {
-    const group = new THREE.Group();
-
-    // Create new scope for block
+  /** Build `group` inside a fresh symbol + transform scope.
+   *
+   *  The `catch` is not tidiness: nothing downstream can reach a group that was
+   *  never returned. The CSG caller records a child only once conversion
+   *  returns, and the Vue callers assign the root only once `astToThreeJS`
+   *  returns — so a body that throws midway (a budget refusal, a bad
+   *  expression) strands whatever it had already built, with no owner to
+   *  dispose it. The `finally` is the other half: a throw must not leave the
+   *  scope frames behind for whatever runs next. */
+  private inScope(group: THREE.Group, build: () => void): THREE.Group {
     this.symbols.pushScope();
     this.pushTransform();
-
-    for (const child of node.children) {
-      const object = this.convertNode(child);
-      if (object) {
-        group.add(object);
-      }
+    try {
+      build();
+    } catch (error) {
+      disposeObject3D(group);
+      throw error;
+    } finally {
+      this.popTransform();
+      this.symbols.popScope();
     }
-
-    // Pop scope
-    this.popTransform();
-    this.symbols.popScope();
-
     return group;
+  }
+
+  private convertBlock(node: { children: SceneNode[] }): THREE.Group {
+    const group = new THREE.Group();
+    return this.inScope(group, () => {
+      for (const child of node.children) {
+        const object = this.convertNode(child);
+        if (object) {
+          group.add(object);
+        }
+      }
+    });
   }
 
   private convertShape(node: ShapeNode): THREE.Mesh {
@@ -464,25 +479,28 @@ export class Converter {
       // Return original shapes as a group if CSG fails
       const fallbackGroup = new THREE.Group();
 
-      // Same scopes as the success path, for the same reason: the children must
-      // be built in the BLOCK's coordinate space, because `savedMatrix` — the
-      // enclosing transform — is applied to the group below. Pushing only a
-      // symbol scope left the parent transform active while converting, so it
-      // landed twice on every fallback shape.
-      this.symbols.pushScope();
-      this.pushTransform();
-      this.currentTransform().matrix.identity();
-
       try {
-        for (const child of node.children) {
-          const object = this.convertNode(child);
-          if (object) {
-            fallbackGroup.add(object);
+        // Same scopes as the success path, for the same reason: the children
+        // must be built in the BLOCK's coordinate space, because `savedMatrix`
+        // — the enclosing transform — is applied to the group below. Pushing
+        // only a symbol scope left the parent transform active while
+        // converting, so it landed twice on every fallback shape.
+        this.inScope(fallbackGroup, () => {
+          this.currentTransform().matrix.identity();
+          for (const child of node.children) {
+            const object = this.convertNode(child);
+            if (object) {
+              fallbackGroup.add(object);
+            }
           }
-        }
-      } finally {
-        this.popTransform();
-        this.symbols.popScope();
+        });
+      } catch (fallbackError) {
+        // The rebuild can fail too — a budget refusal is the likely way, since
+        // the first pass already spent part of it. `inScope` frees the fallback
+        // group; the FIRST pass's operands are still ours to free, and there is
+        // no survivor to protect.
+        disposeScratch(scratch, new THREE.Group());
+        throw fallbackError;
       }
 
       // Apply saved transform to fallback group
@@ -501,97 +519,72 @@ export class Converter {
   private convertForLoop(node: ForLoopNode): THREE.Group {
     const group = new THREE.Group();
 
-    // Create new scope for loop - both symbols and transforms
-    // Transforms accumulate across iterations but are scoped to the loop
-    this.symbols.pushScope();
-    this.pushTransform();
+    // New scope for the loop, both symbols and transforms. Transforms
+    // accumulate across iterations but stay scoped to the loop.
+    return this.inScope(group, () => {
+      // Check if it's a values iteration or range iteration
+      if (node.iterableValues) {
+        // for i in values
+        const values = this.evaluator.evaluate(node.iterableValues);
+        const valueArray = Array.isArray(values) ? values : [values];
+        // Same ceiling as the range form. This one used to bypass both budgets:
+        // the iteration cap lives in `rangeIterations`, and the node cap only
+        // counts what the BODY builds — so an empty body ran the whole list for
+        // free.
+        if (valueArray.length > this.maxLoopIterations) {
+          throw new ShapeScriptLimitError(`ShapeScript loop exceeds ${this.maxLoopIterations} iterations — narrow the range or increase the step`);
+        }
 
-    // Check if it's a values iteration or range iteration
-    if (node.iterableValues) {
-      // for i in values
-      const values = this.evaluator.evaluate(node.iterableValues);
-      const valueArray = Array.isArray(values) ? values : [values];
-      // Same ceiling as the range form. This one used to bypass both budgets:
-      // the iteration cap lives in `rangeIterations`, and the node cap only
-      // counts what the BODY builds — so an empty body ran the whole list for
-      // free.
-      if (valueArray.length > this.maxLoopIterations) {
-        throw new ShapeScriptLimitError(`ShapeScript loop exceeds ${this.maxLoopIterations} iterations — narrow the range or increase the step`);
-      }
+        for (const iterationValue of valueArray) {
+          this.symbols.set(node.variable, iterationValue);
 
-      for (const iterationValue of valueArray) {
-        this.symbols.set(node.variable, iterationValue);
+          // Convert body nodes - transforms accumulate across iterations
+          for (const bodyNode of node.body) {
+            const object = this.convertNode(bodyNode);
+            if (object) {
+              group.add(object);
+            }
+          }
+        }
+      } else {
+        // for i in from to to
+        const from = this.evaluateNumber(node.from);
+        const to = this.evaluateNumber(node.to);
+        const step = node.step ? this.evaluateNumber(node.step) : 1;
 
-        // Convert body nodes - transforms accumulate across iterations
-        for (const bodyNode of node.body) {
-          const object = this.convertNode(bodyNode);
-          if (object) {
-            group.add(object);
+        const iterations = this.rangeIterations(from, to, step);
+
+        for (const i of iterations) {
+          this.symbols.set(node.variable, i);
+
+          // Convert body nodes directly - no iteration sub-groups
+          // Transforms accumulate across iterations within the loop scope
+          for (const bodyNode of node.body) {
+            const object = this.convertNode(bodyNode);
+            if (object) {
+              group.add(object);
+            }
           }
         }
       }
-    } else {
-      // for i in from to to
-      const from = this.evaluateNumber(node.from);
-      const to = this.evaluateNumber(node.to);
-      const step = node.step ? this.evaluateNumber(node.step) : 1;
-
-      const iterations = this.rangeIterations(from, to, step);
-
-      for (const i of iterations) {
-        this.symbols.set(node.variable, i);
-
-        // Convert body nodes directly - no iteration sub-groups
-        // Transforms accumulate across iterations within the loop scope
-        for (const bodyNode of node.body) {
-          const object = this.convertNode(bodyNode);
-          if (object) {
-            group.add(object);
-          }
-        }
-      }
-    }
-
-    // Pop scope - both symbols and transforms
-    this.popTransform();
-    this.symbols.popScope();
-
-    return group;
+    });
   }
 
   private convertIf(node: IfNode): THREE.Group {
     const group = new THREE.Group();
 
-    // Evaluate condition
+    // Evaluated BEFORE the scope is pushed, as it always was.
     const condition = this.evaluator.evaluateToBoolean(node.condition);
 
-    // Create new scope
-    this.symbols.pushScope();
-    this.pushTransform();
-
-    if (condition) {
-      // Execute then body
-      for (const child of node.thenBody) {
+    return this.inScope(group, () => {
+      const body = condition ? node.thenBody : (node.elseBody ?? []);
+      for (const child of body) {
         const object = this.convertNode(child);
         if (object) {
           group.add(object);
         }
       }
-    } else if (node.elseBody) {
-      // Execute else body
-      for (const child of node.elseBody) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
-    }
-
-    // Pop scope
-    this.popTransform();
-    this.symbols.popScope();
-
-    return group;
+    });
   }
 
   private convertSwitch(node: SwitchNode): THREE.Group {
@@ -600,49 +593,16 @@ export class Converter {
     // Evaluate switch value
     const switchValue = this.evaluator.evaluate(node.value);
 
-    // Create new scope
-    this.symbols.pushScope();
-    this.pushTransform();
-
-    let matched = false;
-
-    // Check each case
-    for (const caseNode of node.cases) {
-      for (const caseValue of caseNode.values) {
-        const evalCaseValue = this.evaluator.evaluate(caseValue);
-
-        // Simple equality check
-        if (this.valuesEqual(switchValue, evalCaseValue)) {
-          // Execute case body
-          for (const child of caseNode.body) {
-            const object = this.convertNode(child);
-            if (object) {
-              group.add(object);
-            }
-          }
-          matched = true;
-          break;
-        }
-      }
-
-      if (matched) break;
-    }
-
-    // If no case matched, execute default case
-    if (!matched && node.defaultCase) {
-      for (const child of node.defaultCase) {
+    return this.inScope(group, () => {
+      const matched = node.cases.find((caseNode) => caseNode.values.some((caseValue) => this.valuesEqual(switchValue, this.evaluator.evaluate(caseValue))));
+      const body = matched ? matched.body : (node.defaultCase ?? []);
+      for (const child of body) {
         const object = this.convertNode(child);
         if (object) {
           group.add(object);
         }
       }
-    }
-
-    // Pop scope
-    this.popTransform();
-    this.symbols.popScope();
-
-    return group;
+    });
   }
 
   private handleDefine(node: DefineNode): void {

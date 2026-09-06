@@ -159,6 +159,23 @@ describe("ShapeScript robustness", () => {
     assert.ok(colors.includes("ff0000"), `expected a red CSG result, got ${colors.join(", ") || "none"}`);
   });
 
+  it("frees what a refused loop built before the budget stopped it", () => {
+    // A group that never gets returned is unreachable: the CSG caller records a
+    // child only after conversion returns, and the Vue callers assign the root
+    // only after `astToThreeJS` returns.
+    const disposed: string[] = [];
+    const original = THREE.BufferGeometry.prototype.dispose;
+    THREE.BufferGeometry.prototype.dispose = function patched(this: THREE.BufferGeometry) {
+      disposed.push(this.type);
+    };
+    try {
+      assert.throws(() => astToThreeJS(parseShapeScript("for i in 1 to 50 {\n  cube { position i 0 0 }\n}"), { maxNodes: 6 }), ShapeScriptLimitError);
+    } finally {
+      THREE.BufferGeometry.prototype.dispose = original;
+    }
+    assert.ok(disposed.length > 0, "the refused loop freed nothing");
+  });
+
   it("clamps `detail`, which no loop or node budget can see", () => {
     // One valid statement, one primitive: `detail 100000` on a sphere is
     // segments², i.e. 10^10 vertices, outside both budgets.
