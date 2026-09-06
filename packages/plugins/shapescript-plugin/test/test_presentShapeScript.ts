@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { TOOL_NAME, TOOL_DEFINITION, executePresentShapeScript } from "../src/core/index";
 import { parseShapeScript } from "../src/shapescript/parser";
 import { astToThreeJS, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
+import { disposeScratch } from "../src/shapescript/dispose";
+import * as THREE from "three";
 
 const context = {} as Parameters<typeof executePresentShapeScript>[0];
 
@@ -138,5 +140,70 @@ describe("ShapeScript robustness", () => {
       if (material?.color) colors.push(material.color.getHexString());
     });
     assert.ok(colors.includes("ff0000"), `expected a red material, got ${colors.join(", ") || "none"}`);
+  });
+
+  it("bounds the `for … in values` form with the same iteration budget", () => {
+    // The cap used to live only in the range expansion, and the node budget
+    // counts what the BODY builds — so an empty body ran the whole list free.
+    assert.throws(() => astToThreeJS(parseShapeScript("for i in (1 2 3 4) {\n}"), { maxLoopIterations: 2 }), ShapeScriptLimitError);
+  });
+});
+
+// The CSG operands never enter the scene, so scene teardown cannot reclaim
+// them — but `clone()` shares geometry and material with its source, and a
+// one-operand CSG hands the operand back AS the result. Freeing by identity
+// would therefore free what the survivor still draws with.
+describe("disposeScratch", () => {
+  function spyDispose(target: { dispose: () => void }): () => number {
+    let calls = 0;
+    target.dispose = () => {
+      calls += 1;
+    };
+    return () => calls;
+  }
+
+  it("frees a discarded operand", () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial();
+    const discarded = new THREE.Mesh(geometry, material);
+    const survivor = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    const geometryCalls = spyDispose(geometry);
+    const materialCalls = spyDispose(material);
+
+    disposeScratch([discarded], survivor);
+
+    assert.equal(geometryCalls(), 1);
+    assert.equal(materialCalls(), 1);
+  });
+
+  it("keeps resources the survivor shares with a discarded operand", () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial();
+    const survivor = new THREE.Mesh(geometry, material);
+    // `clone()` shares both — this is what a CSG operand looks like.
+    const discarded = survivor.clone();
+    const geometryCalls = spyDispose(geometry);
+    const materialCalls = spyDispose(material);
+
+    disposeScratch([discarded], survivor);
+
+    assert.equal(geometryCalls(), 0, "freed the geometry the survivor draws with");
+    assert.equal(materialCalls(), 0, "freed the material the survivor draws with");
+  });
+
+  it("leaves a CSG result renderable after its operands are freed", () => {
+    // End to end: the geometry the returned object carries must still have its
+    // position attribute after `convertCSG` disposes the scratch.
+    const group = astToThreeJS(parseShapeScript("difference {\n  sphere { size 2 }\n  sphere { size 1.7 }\n}"));
+    let meshes = 0;
+    group.traverse((object) => {
+      // By `type`, not `instanceof`: the CSG result is a `Brush` from
+      // three-bvh-csg, which resolves its own copy of three under tsx.
+      if (object.type !== "Mesh") return;
+      meshes += 1;
+      const { geometry } = object as THREE.Mesh;
+      assert.ok(geometry.getAttribute("position"), "result geometry lost its positions");
+    });
+    assert.ok(meshes > 0, "CSG produced no mesh");
   });
 });

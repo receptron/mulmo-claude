@@ -28,6 +28,7 @@ import {
   ShapeProperties,
 } from "./types";
 import { Evaluator, SymbolTable, Value } from "./evaluator";
+import { disposeScratch } from "./dispose";
 
 export interface ConversionOptions {
   wireframe?: boolean;
@@ -328,11 +329,17 @@ export class Converter {
       current.matrix.identity();
       current.color = undefined;
 
-      // Convert all children to meshes
+      // Convert all children to meshes. `scratch` holds everything built only
+      // to feed the CSG evaluator — the children themselves, their clones, the
+      // Brushes, and every intermediate `evaluate()` result. None of it ever
+      // enters the scene, so scene teardown never reclaims it; it is freed
+      // against the surviving result at the end of this block.
       const meshes: THREE.Mesh[] = [];
+      const scratch: THREE.Object3D[] = [];
       try {
         for (const child of node.children) {
           const object = this.convertNode(child);
+          if (object) scratch.push(object);
           if (object instanceof THREE.Mesh) {
             // Clone the mesh to avoid modifying the original
             const clonedMesh = object.clone();
@@ -361,6 +368,8 @@ export class Converter {
         return new THREE.Group();
       }
 
+      scratch.push(...meshes);
+
       // Convert meshes to Brushes with materials
       const brushes = meshes.map((mesh) => {
         const brush = new Brush(mesh.geometry, mesh.material);
@@ -370,6 +379,7 @@ export class Converter {
         brush.updateMatrixWorld(true);
         return brush;
       });
+      scratch.push(...brushes);
 
       // Perform CSG operation
       const firstBrush = brushes[0];
@@ -380,26 +390,35 @@ export class Converter {
         const brush = brushes[i];
         if (brush === undefined) continue;
 
+        // Every `evaluate()` allocates a fresh geometry, and the operand it
+        // replaces stops being reachable — so record each one.
+        const evaluate = (a: Brush, b: Brush, operation: typeof ADDITION | typeof SUBTRACTION | typeof INTERSECTION): Brush => {
+          scratch.push(a, b);
+          const produced = csgEvaluator.evaluate(a, b, operation);
+          scratch.push(produced);
+          return produced;
+        };
+
         switch (node.operation) {
           case "union":
-            result = csgEvaluator.evaluate(result, brush, ADDITION);
+            result = evaluate(result, brush, ADDITION);
             break;
           case "difference":
-            result = csgEvaluator.evaluate(result, brush, SUBTRACTION);
+            result = evaluate(result, brush, SUBTRACTION);
             break;
           case "intersection":
-            result = csgEvaluator.evaluate(result, brush, INTERSECTION);
+            result = evaluate(result, brush, INTERSECTION);
             break;
           case "xor": {
             // XOR = (A - B) + (B - A)
-            const aMinusB = csgEvaluator.evaluate(result.clone(), brush.clone(), SUBTRACTION);
-            const bMinusA = csgEvaluator.evaluate(brush.clone(), result.clone(), SUBTRACTION);
-            result = csgEvaluator.evaluate(aMinusB, bMinusA, ADDITION);
+            const aMinusB = evaluate(result.clone(), brush.clone(), SUBTRACTION);
+            const bMinusA = evaluate(brush.clone(), result.clone(), SUBTRACTION);
+            result = evaluate(aMinusB, bMinusA, ADDITION);
             break;
           }
           case "stencil":
             // Stencil keeps shape of first but 'paints' the intersecting areas
-            result = csgEvaluator.evaluate(result, brush, INTERSECTION);
+            result = evaluate(result, brush, INTERSECTION);
             break;
         }
       }
@@ -412,6 +431,12 @@ export class Converter {
       // Apply saved transform to position the CSG result in world space
       result.applyMatrix4(savedMatrix);
       result.updateMatrixWorld(true);
+
+      // Free the operands. By RESOURCE, not by identity: with a single child
+      // the result IS the operand, and `mesh.clone()` shares geometry and
+      // material with its source, so an identity check would free buffers the
+      // returned object still draws with.
+      disposeScratch(scratch, result);
 
       return result;
     } catch (error) {
@@ -454,6 +479,13 @@ export class Converter {
       // for i in values
       const values = this.evaluator.evaluate(node.iterableValues);
       const valueArray = Array.isArray(values) ? values : [values];
+      // Same ceiling as the range form. This one used to bypass both budgets:
+      // the iteration cap lives in `rangeIterations`, and the node cap only
+      // counts what the BODY builds — so an empty body ran the whole list for
+      // free.
+      if (valueArray.length > this.maxLoopIterations) {
+        throw new ShapeScriptLimitError(`ShapeScript loop exceeds ${this.maxLoopIterations} iterations — narrow the range or increase the step`);
+      }
 
       for (const iterationValue of valueArray) {
         this.symbols.set(node.variable, iterationValue);
