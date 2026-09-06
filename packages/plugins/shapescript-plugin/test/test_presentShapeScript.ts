@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 import { TOOL_NAME, TOOL_DEFINITION, executePresentShapeScript } from "../src/core/index";
 import { parseShapeScript } from "../src/shapescript/parser";
-import { astToThreeJS, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
+import { astToThreeJS, MAX_DETAIL, MIN_DETAIL, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
 import { disposeScratch } from "../src/shapescript/dispose";
 import * as THREE from "three";
 
@@ -157,6 +157,24 @@ describe("ShapeScript robustness", () => {
       }
     });
     assert.ok(colors.includes("ff0000"), `expected a red CSG result, got ${colors.join(", ") || "none"}`);
+  });
+
+  it("clamps `detail`, which no loop or node budget can see", () => {
+    // One valid statement, one primitive: `detail 100000` on a sphere is
+    // segments², i.e. 10^10 vertices, outside both budgets.
+    const positions = (script: string): number => {
+      const group = astToThreeJS(parseShapeScript(script));
+      let count = 0;
+      group.traverse((object) => {
+        const { geometry } = object as { geometry?: THREE.BufferGeometry };
+        count += geometry?.getAttribute("position")?.count ?? 0;
+      });
+      return count;
+    };
+    const clamped = positions(`detail ${MAX_DETAIL}\nsphere { size 1 }`);
+    assert.equal(positions("detail 100000\nsphere { size 1 }"), clamped);
+    // And the floor, so a degenerate value still closes a surface.
+    assert.equal(positions("detail 0\nsphere { size 1 }"), positions(`detail ${MIN_DETAIL}\nsphere { size 1 }`));
   });
 
   it("bounds a `for` inside a path, which never reaches the node budget", () => {

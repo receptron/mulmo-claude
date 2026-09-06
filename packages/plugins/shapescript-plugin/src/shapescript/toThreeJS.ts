@@ -49,6 +49,16 @@ export interface ConversionOptions {
 export const DEFAULT_MAX_NODES = 20_000;
 export const DEFAULT_MAX_LOOP_ITERATIONS = 100_000;
 
+// `detail` is a smoothing hint that becomes a SEGMENT COUNT on every curved
+// primitive, and a sphere is segments², so `detail 100000` asks for 10^10
+// vertices from a single valid statement — outside both budgets above, since it
+// is one node in one loop-free script. Clamped rather than refused: it is a
+// hint, and rounding an absurd one down still draws the model the author meant.
+// 256 segments is already smoother than any viewport resolves; 3 is the least
+// that closes a surface.
+export const MIN_DETAIL = 3;
+export const MAX_DETAIL = 256;
+
 /** Its own class so `convertCSG`'s fallback can rethrow it instead of swallowing
  *  it: catching a budget error there would rebuild the same runaway children as
  *  a plain group, which is the work the budget exists to refuse. */
@@ -743,8 +753,14 @@ export class Converter {
   }
 
   private handleDetail(node: DetailNode): void {
-    this.detailLevel = this.evaluateNumber(node.value);
-    // Also add 'detail' as a variable so it can be referenced in expressions
+    const requested = this.evaluateNumber(node.value);
+    // NaN survives both comparisons of a naive clamp, and a fractional segment
+    // count silently truncates inside three.js — normalise here so every
+    // geometry below gets an integer in range.
+    this.detailLevel = Number.isFinite(requested) ? Math.min(MAX_DETAIL, Math.max(MIN_DETAIL, Math.floor(requested))) : MIN_DETAIL;
+    // Also add 'detail' as a variable so it can be referenced in expressions.
+    // The CLAMPED value, so an expression reading `detail` agrees with what was
+    // actually drawn.
     this.symbols.set("detail", this.detailLevel);
   }
 

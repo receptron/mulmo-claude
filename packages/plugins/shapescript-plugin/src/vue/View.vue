@@ -364,7 +364,10 @@ function applyScript() {
 watch(
   () => props.selectedResult.data?.script,
   (newScript) => {
-    if (newScript) editableScript.value = newScript;
+    // `undefined` means "no data yet" and keeps whatever is in the box; an
+    // empty STRING is a valid script that cleared the scene, and leaving the
+    // old source visible invited the user to re-apply what they just removed.
+    if (newScript !== undefined) editableScript.value = newScript;
   },
 );
 
