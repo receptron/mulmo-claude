@@ -231,6 +231,27 @@ describe("disposeScratch", () => {
     assert.equal(geometryCalls(), 1);
   });
 
+  it("frees what a refused CSG built before the budget rejected it", () => {
+    // The rethrow path returns nothing, so every operand built before the
+    // refusal is unreachable — and a rejected preview can be retried.
+    const disposed: string[] = [];
+    const original = THREE.BufferGeometry.prototype.dispose;
+    THREE.BufferGeometry.prototype.dispose = function patched(this: THREE.BufferGeometry) {
+      disposed.push(this.type);
+    };
+    try {
+      // The FIRST child must succeed (so `scratch` holds something) and a later
+      // one must trip the budget.
+      assert.throws(
+        () => astToThreeJS(parseShapeScript("difference {\n  sphere { size 2 }\n  for i in 1 to 50 {\n    cube { position i 0 0 }\n  }\n}"), { maxNodes: 6 }),
+        ShapeScriptLimitError,
+      );
+    } finally {
+      THREE.BufferGeometry.prototype.dispose = original;
+    }
+    assert.ok(disposed.length > 0, "the refused CSG freed nothing");
+  });
+
   it("leaves a CSG result renderable after its operands are freed", () => {
     // End to end: the geometry the returned object carries must still have its
     // position attribute after `convertCSG` disposes the scratch.

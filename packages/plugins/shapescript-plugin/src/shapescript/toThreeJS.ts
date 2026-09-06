@@ -443,8 +443,14 @@ export class Converter {
       return result;
     } catch (error) {
       // A budget refusal is not a CSG failure — rebuilding the same children as
-      // a plain group would do exactly the work the budget refused.
-      if (error instanceof ShapeScriptLimitError) throw error;
+      // a plain group would do exactly the work the budget refused. Nothing
+      // survives this path, so everything built before the refusal is freed:
+      // a rejected preview would otherwise leak whatever the earlier children
+      // had already allocated, once per attempt.
+      if (error instanceof ShapeScriptLimitError) {
+        disposeScratch(scratch, new THREE.Group());
+        throw error;
+      }
       // Return original shapes as a group if CSG fails
       const fallbackGroup = new THREE.Group();
 
