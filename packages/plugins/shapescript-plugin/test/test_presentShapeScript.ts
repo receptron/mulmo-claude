@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 import { TOOL_NAME, TOOL_DEFINITION, executePresentShapeScript } from "../src/core/index";
 import { parseShapeScript } from "../src/shapescript/parser";
-import { astToThreeJS, MAX_DETAIL, MIN_DETAIL, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
+import { astToThreeJS, DEFAULT_MAX_VERTICES, MAX_DETAIL, MIN_DETAIL, ShapeScriptLimitError } from "../src/shapescript/toThreeJS";
 import { disposeScratch } from "../src/shapescript/dispose";
 import * as THREE from "three";
 
@@ -174,6 +174,17 @@ describe("ShapeScript robustness", () => {
       THREE.BufferGeometry.prototype.dispose = original;
     }
     assert.ok(disposed.length > 0, "the refused loop freed nothing");
+  });
+
+  it("bounds the aggregate vertex count, which the node and detail caps miss", () => {
+    // Each factor is capped but their PRODUCT is not: a loop of high-detail
+    // spheres satisfies `maxNodes`, `maxLoopIterations` and `MAX_DETAIL` while
+    // allocating far more than any renderer survives.
+    const script = `detail ${MAX_DETAIL}\nfor i in 1 to 200 {\n  sphere { position i 0 0 size 1 }\n}`;
+    assert.throws(() => astToThreeJS(parseShapeScript(script)), ShapeScriptLimitError);
+    // …and the same script is fine once it fits the budget.
+    assert.doesNotThrow(() => astToThreeJS(parseShapeScript("detail 8\nfor i in 1 to 20 {\n  sphere { position i 0 0 size 1 }\n}")));
+    assert.ok(DEFAULT_MAX_VERTICES > 0);
   });
 
   it("clamps `detail`, which no loop or node budget can see", () => {

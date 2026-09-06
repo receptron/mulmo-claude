@@ -38,6 +38,9 @@ export interface ConversionOptions {
   /** Hard ceiling on the iterations one `for` may run. See
    *  `DEFAULT_MAX_LOOP_ITERATIONS`. */
   maxLoopIterations?: number;
+  /** Hard ceiling on the vertices one script may allocate in total. See
+   *  `DEFAULT_MAX_VERTICES`. */
+  maxVertices?: number;
 }
 
 // Conversion runs synchronously on the browser's main thread, and the script is
@@ -58,6 +61,13 @@ export const DEFAULT_MAX_LOOP_ITERATIONS = 100_000;
 // that closes a surface.
 export const MIN_DETAIL = 3;
 export const MAX_DETAIL = 256;
+
+// The node and detail caps bound each factor but not their PRODUCT: 20k spheres
+// at the maximum detail is ~10^9 vertices, and a position alone is 12 bytes
+// before normals and UVs — tens of gigabytes, allocated synchronously, from a
+// script that satisfies every other budget. This is the aggregate ceiling.
+// 2M vertices is a heavy scene that still renders; an order more does not.
+export const DEFAULT_MAX_VERTICES = 2_000_000;
 
 /** Its own class so `convertCSG`'s fallback can rethrow it instead of swallowing
  *  it: catching a budget error there would rebuild the same runaway children as
@@ -83,6 +93,8 @@ export class Converter {
   private detailLevel: number = 32; // Default detail level for curved shapes
   /** Objects produced so far, checked against `maxNodes` on every node. */
   private nodeCount = 0;
+  /** Vertices allocated so far, checked against `maxVertices` on every mesh. */
+  private vertexCount = 0;
 
   // Transform state stack for relative transforms
   private transformStack: TransformState[] = [];
@@ -114,6 +126,24 @@ export class Converter {
 
   private get maxLoopIterations(): number {
     return this.options.maxLoopIterations ?? DEFAULT_MAX_LOOP_ITERATIONS;
+  }
+
+  private get maxVertices(): number {
+    return this.options.maxVertices ?? DEFAULT_MAX_VERTICES;
+  }
+
+  /** Every mesh in the scene is built here, so the AGGREGATE vertex count is
+   *  bounded and not merely the node count. Charged after the geometry exists —
+   *  one primitive is bounded by `MAX_DETAIL²`, so the allocation that trips the
+   *  limit is small, and it is freed before the refusal propagates. */
+  private makeMesh(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Mesh {
+    this.vertexCount += geometry.getAttribute("position")?.count ?? 0;
+    if (this.vertexCount > this.maxVertices) {
+      geometry.dispose();
+      material.dispose();
+      throw new ShapeScriptLimitError(`ShapeScript exceeds ${this.maxVertices} vertices — lower \`detail\` or use fewer shapes`);
+    }
+    return new THREE.Mesh(geometry, material);
   }
 
   /** Expand a `for … from to to step` range without materialising it first.
@@ -231,7 +261,7 @@ export class Converter {
   private convertShape(node: ShapeNode): THREE.Mesh {
     const geometry = this.createGeometry(node);
     const material = this.createMaterial(node);
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = this.makeMesh(geometry, material);
 
     // Apply any property-specific transforms first (local)
     this.applyExplicitTransforms(mesh, node.properties);
@@ -788,7 +818,7 @@ export class Converter {
     // Create material
     const material = this.createMaterial(node);
 
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = this.makeMesh(geometry, material);
 
     this.applyExplicitTransforms(mesh, node.properties);
     this.applyCurrentTransform(mesh);
@@ -1009,7 +1039,7 @@ export class Converter {
 
     // Create material
     const material = this.createMaterial(node);
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = this.makeMesh(geometry, material);
 
     this.applyExplicitTransforms(mesh, node.properties);
     this.applyCurrentTransform(mesh);
@@ -1083,7 +1113,7 @@ export class Converter {
 
     // Create material
     const material = this.createMaterial(node);
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = this.makeMesh(geometry, material);
 
     this.applyExplicitTransforms(mesh, node.properties);
     this.applyCurrentTransform(mesh);
