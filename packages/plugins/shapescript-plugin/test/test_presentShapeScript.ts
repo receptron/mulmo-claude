@@ -176,6 +176,48 @@ describe("ShapeScript robustness", () => {
     assert.ok(disposed.length > 0, "the refused loop freed nothing");
   });
 
+  it("refuses an oversized lathe profile BEFORE LatheGeometry allocates", () => {
+    // `makeMesh` charges what a geometry holds, which is too late here: the
+    // constructor would commit ~25M vertices for a long profile at high detail
+    // before there is anything to measure. Patching the constructor proves the
+    // refusal happens first.
+    // The ESM namespace is frozen, so the constructor cannot be swapped —
+    // count buffer allocations instead. Any geometry construction populates
+    // attributes, and this script builds nothing else.
+    let attributes = 0;
+    const original = THREE.BufferGeometry.prototype.setAttribute;
+    THREE.BufferGeometry.prototype.setAttribute = function patched(this: THREE.BufferGeometry, ...args: Parameters<typeof original>) {
+      attributes += 1;
+      return original.apply(this, args);
+    };
+    try {
+      // ~9000 profile points × (256 + 1) rings ≈ 2.3M vertices, just over the
+      // 2M budget — and every part of it is individually legal.
+      const script = `detail ${MAX_DETAIL}\nlathe {\n  path {\n    for i in 1 to 9000 {\n      point 1 i\n    }\n  }\n}`;
+      assert.throws(() => astToThreeJS(parseShapeScript(script)), ShapeScriptLimitError);
+    } finally {
+      THREE.BufferGeometry.prototype.setAttribute = original;
+    }
+    assert.equal(attributes, 0, "geometry buffers were allocated before the budget refused them");
+  });
+
+  it("frees the root group when the conversion fails at the top level", () => {
+    // Not nested in a loop or a CSG block: the root itself is abandoned, and
+    // both Vue surfaces catch the error to display it, so nothing downstream
+    // ever sees the group.
+    const disposed: string[] = [];
+    const original = THREE.BufferGeometry.prototype.dispose;
+    THREE.BufferGeometry.prototype.dispose = function patched(this: THREE.BufferGeometry) {
+      disposed.push(this.type);
+    };
+    try {
+      assert.throws(() => astToThreeJS(parseShapeScript("cube { size 1 }\ncube { size 1 }\ncube { size 1 }"), { maxNodes: 2 }), ShapeScriptLimitError);
+    } finally {
+      THREE.BufferGeometry.prototype.dispose = original;
+    }
+    assert.ok(disposed.length > 0, "the refused root freed nothing");
+  });
+
   it("bounds the aggregate vertex count, which the node and detail caps miss", () => {
     // Each factor is capped but their PRODUCT is not: a loop of high-detail
     // spheres satisfies `maxNodes`, `maxLoopIterations` and `MAX_DETAIL` while

@@ -110,11 +110,20 @@ export class Converter {
   convert(nodes: SceneNode[]): THREE.Group {
     const group = new THREE.Group();
 
-    for (const node of nodes) {
-      const object = this.convertNode(node);
-      if (object) {
-        group.add(object);
+    try {
+      for (const node of nodes) {
+        const object = this.convertNode(node);
+        if (object) {
+          group.add(object);
+        }
       }
+    } catch (error) {
+      // The ROOT is abandoned the same way a nested group is: the callers
+      // assign it only once this returns, and both Vue surfaces catch the error
+      // to show it — so 19,999 meshes built before the 20,000th tripped the
+      // budget would stay allocated, once per rejected render.
+      disposeObject3D(group);
+      throw error;
     }
 
     return group;
@@ -130,6 +139,19 @@ export class Converter {
 
   private get maxVertices(): number {
     return this.options.maxVertices ?? DEFAULT_MAX_VERTICES;
+  }
+
+  /** Charge an ESTIMATE before the allocation happens.
+   *
+   *  `makeMesh` charges what a geometry actually holds, which is too late for a
+   *  constructor whose inputs already predict something enormous:
+   *  `LatheGeometry` over a 100k-point profile at `detail 256` allocates ~25M
+   *  vertices — hundreds of MB on the UI thread — before there is anything to
+   *  measure. Where the count is predictable, refuse first. */
+  private chargeEstimate(vertices: number): void {
+    if (this.vertexCount + vertices > this.maxVertices) {
+      throw new ShapeScriptLimitError(`ShapeScript exceeds ${this.maxVertices} vertices — lower \`detail\` or simplify the path`);
+    }
   }
 
   /** Every mesh in the scene is built here, so the AGGREGATE vertex count is
@@ -665,38 +687,30 @@ export class Converter {
       return null;
     }
 
-    // Create new scope for custom shape instantiation
-    this.symbols.pushScope();
-    this.pushTransform();
-
-    // Set default values from options
-    if (defineNode.options) {
-      for (const option of defineNode.options) {
-        const defaultValue = this.evaluator.evaluate(option.defaultValue);
-        this.symbols.set(option.name, defaultValue);
-      }
-    }
-
-    // Override with provided properties
-    for (const [key, value] of Object.entries(node.properties)) {
-      const evaluatedValue = this.evaluator.evaluate(value as Expression);
-      this.symbols.set(key, evaluatedValue);
-    }
-
-    // Convert the body
+    // Same scope handling as every other group builder: a body node that throws
+    // must not strand the group (a custom shape can be a CSG operand, where
+    // nothing downstream ever sees it) or leave the frames behind.
     const group = new THREE.Group();
-    for (const child of defineNode.body) {
-      const object = this.convertNode(child);
-      if (object) {
-        group.add(object);
+    const body = defineNode.body;
+    return this.inScope(group, () => {
+      // Set default values from options
+      for (const option of defineNode.options ?? []) {
+        this.symbols.set(option.name, this.evaluator.evaluate(option.defaultValue));
       }
-    }
 
-    // Pop scope
-    this.popTransform();
-    this.symbols.popScope();
+      // Override with provided properties
+      for (const [key, value] of Object.entries(node.properties)) {
+        this.symbols.set(key, this.evaluator.evaluate(value as Expression));
+      }
 
-    return group;
+      // Convert the body
+      for (const child of body) {
+        const object = this.convertNode(child);
+        if (object) {
+          group.add(object);
+        }
+      }
+    });
   }
 
   private pushTransform(): void {
@@ -1030,6 +1044,11 @@ export class Converter {
       this.symbols.popScope();
       return new THREE.Group();
     }
+
+    // What `LatheGeometry` is about to allocate: one ring of `detail + 1`
+    // vertices per profile point. Checked BEFORE the constructor runs, since by
+    // the time `makeMesh` could measure it the memory is already committed.
+    this.chargeEstimate(points.length * (this.detailLevel + 1));
 
     // Create lathe geometry
     const geometry = new THREE.LatheGeometry(

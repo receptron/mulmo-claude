@@ -196,34 +196,28 @@ function handleResize() {
   renderer.setSize(width, height);
 }
 
+// `scene.remove` only drops the reference; the GPU buffers live until each
+// geometry and material is disposed, and this runs again on every script edit
+// and wireframe toggle, so the leak ends in a lost WebGL context.
+function clearScene() {
+  sceneObjects.forEach((obj) => removeAndDispose(scene, obj));
+  sceneObjects = [];
+}
+
+function renderScript(script: string) {
+  const group = astToThreeJS(parseShapeScript(script), { wireframe: showWireframe.value });
+  scene.add(group);
+  sceneObjects.push(group);
+}
+
 function loadShapeScript() {
   try {
-    // Clear previous scene objects — and free them. `scene.remove` only drops
-    // the reference; the GPU buffers live until each geometry / material is
-    // disposed, and this runs again on every script edit and wireframe toggle,
-    // so the leak ends in a lost WebGL context.
-    sceneObjects.forEach((obj) => removeAndDispose(scene, obj));
-    sceneObjects = [];
-
-    // Parse ShapeScript into AST
+    clearScene();
     const script = props.selectedResult.data?.script;
-    if (!script) {
-      // Nothing to draw is not an error, and this path is reached when a result
-      // moves from an INVALID script to a valid empty one: the scene clears, so
-      // leaving the previous parse error on screen described geometry that is
-      // no longer there.
-      parseError.value = null;
-      return;
-    }
-    const ast = parseShapeScript(script);
-
-    // Convert AST to Three.js objects
-    const group = astToThreeJS(ast, { wireframe: showWireframe.value });
-
-    // Add to scene
-    scene.add(group);
-    sceneObjects.push(group);
-
+    // An empty script is valid and clears the scene — reached when a result
+    // moves from an INVALID script to an empty one, where leaving the previous
+    // error on screen described geometry that is no longer there.
+    if (script) renderScript(script);
     parseError.value = null;
   } catch (error) {
     parseError.value = error instanceof Error ? error.message : "Unknown error";
