@@ -176,6 +176,38 @@ describe("ShapeScript robustness", () => {
     assert.ok(disposed.length > 0, "the refused loop freed nothing");
   });
 
+  it("builds a path from its points — `moveTo` adds no curve, so the pen has to be tracked", () => {
+    // The original check said "curves.length === 0 → moveTo", but `moveTo`
+    // does not add a curve, so EVERY point took that branch and the shape came
+    // out empty: `extrude` and `fill` rendered nothing at all.
+    const group = astToThreeJS(parseShapeScript("fill {\n  path {\n    point 0 0\n    point 1 0\n    point 1 1\n  }\n}"));
+    let positions = 0;
+    group.traverse((object) => {
+      if (object.type !== "Mesh") return;
+      positions += (object as THREE.Mesh).geometry.getAttribute("position")?.count ?? 0;
+    });
+    assert.ok(positions > 0, "fill produced an empty geometry");
+  });
+
+  it("refuses an oversized extruded path BEFORE ExtrudeGeometry allocates", () => {
+    // Same hole as the lathe: the path is bounded by `maxLoopIterations`, and
+    // the constructor multiplies it again by `curveSegments`, so the charge has
+    // to happen first. Counting buffer allocations proves the ordering.
+    let attributes = 0;
+    const original = THREE.BufferGeometry.prototype.setAttribute;
+    THREE.BufferGeometry.prototype.setAttribute = function patched(this: THREE.BufferGeometry, ...args: Parameters<typeof original>) {
+      attributes += 1;
+      return original.apply(this, args);
+    };
+    try {
+      const script = `detail ${MAX_DETAIL}\nextrude {\n  path {\n    for i in 1 to 60000 {\n      point i 1\n    }\n  }\n}`;
+      assert.throws(() => astToThreeJS(parseShapeScript(script)), ShapeScriptLimitError);
+    } finally {
+      THREE.BufferGeometry.prototype.setAttribute = original;
+    }
+    assert.equal(attributes, 0, "geometry buffers were allocated before the budget refused them");
+  });
+
   it("refuses an oversized lathe profile BEFORE LatheGeometry allocates", () => {
     // `makeMesh` charges what a geometry holds, which is too late here: the
     // constructor would commit ~25M vertices for a long profile at high detail

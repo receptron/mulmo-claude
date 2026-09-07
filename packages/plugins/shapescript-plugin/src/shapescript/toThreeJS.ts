@@ -69,6 +69,16 @@ export const MAX_DETAIL = 256;
 // 2M vertices is a heavy scene that still renders; an order more does not.
 export const DEFAULT_MAX_VERTICES = 2_000_000;
 
+// `ShapeGeometry`'s own default when no `curveSegments` is passed. Named here
+// because the pre-flight estimate has to predict what the constructor will do.
+const SHAPE_GEOMETRY_CURVE_SEGMENTS = 12;
+
+// An extruded profile becomes two caps plus the wall ring between them, so it
+// costs a few vertices per profile point rather than one. Deliberately a rough
+// upper-ish bound: the estimate only has to be close enough to refuse the
+// scripts that would otherwise commit gigabytes.
+const EXTRUDE_VERTICES_PER_POINT = 4;
+
 /** Its own class so `convertCSG`'s fallback can rethrow it instead of swallowing
  *  it: catching a budget error there would rebuild the same runaway children as
  *  a plain group, which is the work the budget exists to refuse. */
@@ -143,6 +153,18 @@ export class Converter {
    *  `LatheGeometry` over a 100k-point profile at `detail 256` allocates ~25M
    *  vertices — hundreds of MB on the UI thread — before there is anything to
    *  measure. Where the count is predictable, refuse first. */
+  /** Pre-flight charge for a geometry built from a path.
+   *
+   *  `Shape.curves` is a plain array, so reading its length allocates nothing —
+   *  unlike `getPoints()`, which would build the very buffer we are trying to
+   *  refuse. A path may hold up to `maxLoopIterations` points, and at high
+   *  detail the constructor multiplies that again, so `ExtrudeGeometry` and
+   *  `ShapeGeometry` need the same treatment `LatheGeometry` got. */
+  private chargePathEstimate(shape: THREE.Shape, segmentsPerCurve: number, verticesPerPoint = 1): void {
+    const points = Math.max(1, shape.curves.length) * Math.max(1, segmentsPerCurve);
+    this.chargeEstimate(points * verticesPerPoint);
+  }
+
   private chargeEstimate(vertices: number): void {
     if (this.vertexCount + vertices > this.maxVertices) {
       throw new ShapeScriptLimitError(`ShapeScript exceeds ${this.maxVertices} vertices — lower \`detail\` or simplify the path`);
@@ -801,10 +823,13 @@ export class Converter {
     const depth = size[2] || 1;
 
     // Create extruded geometry
+    const curveSegments = Math.max(1, Math.floor(this.detailLevel / 4));
+    this.chargePathEstimate(shape, curveSegments, EXTRUDE_VERTICES_PER_POINT);
+
     const geometry = new THREE.ExtrudeGeometry(shape, {
       depth,
       bevelEnabled: false,
-      curveSegments: Math.max(1, Math.floor(this.detailLevel / 4)),
+      curveSegments,
     });
 
     // Create material
@@ -823,6 +848,11 @@ export class Converter {
     let currentX = 0;
     let currentY = 0;
     let currentAngle = 0; // In radians
+    // `moveTo` sets the pen without adding a curve, so `curves.length` stays 0
+    // after the first point — which made the ORIGINAL check below `moveTo`
+    // every point and never `lineTo` any of them. The shape came out empty, so
+    // `extrude` and `fill` rendered nothing at all. Track the pen explicitly.
+    let penDown = false;
 
     const processCommand = (command: PathCommand) => {
       switch (command.type) {
@@ -839,10 +869,11 @@ export class Converter {
           currentX += rotatedX;
           currentY += rotatedY;
 
-          if (shape.curves.length === 0) {
-            shape.moveTo(currentX, currentY);
-          } else {
+          if (penDown) {
             shape.lineTo(currentX, currentY);
+          } else {
+            shape.moveTo(currentX, currentY);
+            penDown = true;
           }
           break;
         }
@@ -860,6 +891,12 @@ export class Converter {
           currentX += rotatedX;
           currentY += rotatedY;
 
+          // A curve needs a starting point like any other segment.
+          if (!penDown) {
+            shape.moveTo(currentX, currentY);
+            penDown = true;
+            break;
+          }
           if (command.controlX !== undefined && command.controlY !== undefined) {
             const cx = this.evaluateNumber(command.controlX);
             const cy = this.evaluateNumber(command.controlY);
@@ -1074,7 +1111,9 @@ export class Converter {
       }
 
       // Build the 2D shape, then a ShapeGeometry (flat 2D shape) from it
-      const geometry = new THREE.ShapeGeometry(this.buildPath(pathNode));
+      const shape = this.buildPath(pathNode);
+      this.chargePathEstimate(shape, SHAPE_GEOMETRY_CURVE_SEGMENTS);
+      const geometry = new THREE.ShapeGeometry(shape);
       const mesh = this.makeMesh(geometry, this.createMaterial(node));
 
       this.applyExplicitTransforms(mesh, node.properties);
