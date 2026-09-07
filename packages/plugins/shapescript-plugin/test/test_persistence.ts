@@ -42,16 +42,25 @@ const CUBE = "cube { size 1 }";
 
 describe("shape artifact paths", () => {
   it("mints a flat, slugged, collision-suffixed path under artifacts/shapes", () => {
-    const { relPath, filePath } = shapeArtifactPath("A Desk Lamp", new Date(1718765432101));
-    assert.equal(relPath, "shapes/a-desk-lamp-1718765432101.shape");
-    assert.equal(filePath, "artifacts/shapes/a-desk-lamp-1718765432101.shape");
+    const { relPath, filePath } = shapeArtifactPath("A Desk Lamp", new Date(1718765432101), "abcd1234");
+    assert.equal(relPath, "shapes/a-desk-lamp-1718765432101-abcd1234.shape");
+    assert.equal(filePath, "artifacts/shapes/a-desk-lamp-1718765432101-abcd1234.shape");
     // Flat, not YYYY/MM-partitioned — one directory the user can browse.
     assert.equal(relPath.split("/").length, 2);
   });
 
   it("falls back to a usable slug when the title contributes nothing", () => {
-    const { relPath } = shapeArtifactPath("🙂", new Date(1718765432101));
-    assert.equal(relPath, "shapes/shape-1718765432101.shape");
+    const { relPath } = shapeArtifactPath("🙂", new Date(1718765432101), "abcd1234");
+    assert.equal(relPath, "shapes/shape-1718765432101-abcd1234.shape");
+  });
+
+  // The timestamp alone does not separate two calls inside one millisecond, and
+  // `write` overwrites unconditionally — the loser of that race would vanish.
+  it("mints different paths for the same title at the same instant", () => {
+    const when = new Date(1718765432101);
+    const first = shapeArtifactPath("Lamp", when).relPath;
+    const second = shapeArtifactPath("Lamp", when).relPath;
+    assert.notEqual(first, second);
   });
 
   // The guard is the primary defence before a FileOps write: `path.join` does
@@ -59,6 +68,11 @@ describe("shape artifact paths", () => {
   it("refuses traversal, the wrong extension, and paths outside the artifacts dir", () => {
     assert.equal(isShapeArtifactPath("artifacts/shapes/lamp.shape"), true);
     assert.equal(isShapeArtifactPath("artifacts/shapes/../../secrets.shape"), false);
+    // Backslash traversal too: this guard is canonical-looking to a `/` split,
+    // but `node:path` on Windows — and FileOps' own normalisation — read those
+    // as separators and escape the directory (codex on #3056).
+    assert.equal(isShapeArtifactPath("artifacts/shapes/..\\..\\secrets.shape"), false);
+    assert.equal(isShapeArtifactPath("artifacts/shapes/..\\documents/x.shape"), false);
     assert.equal(isShapeArtifactPath("artifacts/shapes/lamp.md"), false);
     assert.equal(isShapeArtifactPath("artifacts/documents/lamp.shape"), false);
     assert.equal(isShapeArtifactPath("shapes/lamp.shape"), false);
@@ -77,6 +91,27 @@ describe("shape artifact paths", () => {
 });
 
 describe("presentShapeScript persistence", () => {
+  it("re-mints rather than overwriting when the path is already taken", async () => {
+    // The first candidate is occupied, so the save must land somewhere else
+    // instead of replacing a model that is already there.
+    const artifacts = memoryFiles();
+    const taken = new Set<string>();
+    const realExists = artifacts.exists.bind(artifacts);
+    let probes = 0;
+    artifacts.exists = async (rel: string) => {
+      probes += 1;
+      if (probes === 1) {
+        taken.add(rel);
+        return true;
+      }
+      return realExists(rel);
+    };
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Lamp", script: CUBE });
+    assert.ok(result.data?.filePath);
+    assert.ok(!taken.has(toArtifactsRelative(result.data.filePath)), "wrote over the occupied path");
+    assert.equal(artifacts.store.size, 1);
+  });
+
   it("saves a new script and names the file it wrote", async () => {
     const artifacts = memoryFiles();
     const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Cube", script: CUBE });
@@ -159,6 +194,18 @@ describe("shapescript dispatch", () => {
     const saved = await executeShapeScriptDispatch(context, { kind: "saveShape", path: "artifacts/shapes/lamp.shape", script: next });
     assert.deepEqual(saved, { path: "artifacts/shapes/lamp.shape" });
     assert.equal(artifacts.store.get("shapes/lamp.shape"), next);
+  });
+
+  // `FileOps.write` creates what is missing, so without the existence check the
+  // View's save channel could mint `.shape` files at caller-chosen paths — a
+  // wider capability than editing the model on screen.
+  it("refuses to create a file that does not exist", async () => {
+    const artifacts = memoryFiles();
+    await assert.rejects(
+      () => executeShapeScriptDispatch({ files: { artifacts } }, { kind: "saveShape", path: "artifacts/shapes/new.shape", script: CUBE }),
+      /No ShapeScript exists at/,
+    );
+    assert.equal(artifacts.store.size, 0);
   });
 
   it("refuses a traversal path before touching FileOps", async () => {

@@ -23,9 +23,9 @@ export function locateShape(context: ShapeScriptDispatchContext, filePath: strin
 /**
  * Server-side router for the View's `useRuntime().dispatch({ kind, … })` calls.
  * `loadShape` returns the source's current bytes (the View refreshes from disk
- * rather than trusting the copy in the tool result); `saveShape` overwrites it
- * in place. Both validate containment with the same guards as the tool-call
- * path before touching FileOps.
+ * rather than trusting the copy in the tool result); `saveShape` overwrites one
+ * that already exists, and refuses to create. Both validate containment with
+ * the same guards as the tool-call path before touching FileOps.
  *
  * Throws on an invalid path / missing file — the host's dispatch route maps a
  * throw to a non-2xx, which the View's `dispatch` rejects on. Geometry is NOT
@@ -55,6 +55,14 @@ export async function executeShapeScriptDispatch(
     case "saveShape": {
       if (typeof args.script !== "string") {
         throw new Error("saveShape requires `script` as a string");
+      }
+      // Overwrite-only, the same contract `overwriteDocument` carries: this
+      // channel edits a model the user is looking at, so a path that does not
+      // exist is a typo or a file deleted mid-edit, not a save. `FileOps.write`
+      // would happily create it — and creating `.shape` files at caller-chosen
+      // paths is a wider capability than editing one (CodeRabbit on #3056).
+      if (!(await target.files.exists(target.rel))) {
+        throw new Error(`No ShapeScript exists at ${args.path}`);
       }
       await target.files.write(target.rel, args.script);
       return { path: args.path };

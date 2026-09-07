@@ -36,12 +36,38 @@ export interface ShapePath {
   filePath: string;
 }
 
+/** Short random token for a filename. `crypto.getRandomValues` where it exists
+ *  — both browsers and node ≥19 expose it on `globalThis` — falling back to
+ *  `Math.random`, which is weaker but only ever needs to avoid a collision, not
+ *  resist an attacker. */
+function randomToken(): string {
+  const source = globalThis.crypto;
+  if (source?.getRandomValues) {
+    const bytes = source.getRandomValues(new Uint8Array(4));
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+}
+
 /** Build a fresh, collision-safe artifact path for a new ShapeScript source.
  *  Flat rather than `YYYY/MM`-partitioned (the `artifacts/stories` shape): a
  *  model is something the user opens by name, and one directory keeps that
- *  browsable. */
-export function shapeArtifactPath(title: string | undefined, now: Date = new Date()): ShapePath {
-  const relPath = buildArtifactRelPath({ dir: SHAPE_DIR, title, ext: ".shape", fallback: SHAPE_FALLBACK_SLUG, now, partitioned: false });
+ *  browsable.
+ *
+ *  The random token matters because the timestamp alone does not: two calls
+ *  sharing a title inside one millisecond mint the SAME name, and the second
+ *  `write` replaces the first model with no error anywhere (codex on #3056).
+ *  `token` is injectable so a test can assert the whole filename. */
+export function shapeArtifactPath(title: string | undefined, now: Date = new Date(), token: string = randomToken()): ShapePath {
+  const relPath = buildArtifactRelPath({
+    dir: SHAPE_DIR,
+    title,
+    ext: ".shape",
+    fallback: SHAPE_FALLBACK_SLUG,
+    now,
+    partitioned: false,
+    suffix: token,
+  });
   return { relPath, filePath: toWorkspaceArtifactPath(relPath) };
 }
 

@@ -1297,23 +1297,22 @@ nor remove documents that other members also read, and removing its records
 first does not unlock it. Retiring the whole app is a Firestore project
 administrator's recursive delete, not something this app does.
 
-## `renderShapeScript` says Playwright's Chromium is not installed
+## `renderShapeScript` says Chromium is not installed
 
-`renderShapeScript` rasterises a ShapeScript model by driving a headless
-Chromium, and that browser is a DEVELOPMENT dependency — it ships with the
-MulmoClaude checkout, not with an npm install. When it is absent the tool
-returns, instead of an image path:
+`renderShapeScript` rasterises a ShapeScript model by driving Puppeteer's
+headless Chromium — the same browser the PDF export uses. Puppeteer downloads
+it at install time, so this normally just works; a host that set
+`PUPPETEER_SKIP_DOWNLOAD`, or a sandbox that cannot spawn a browser, has none.
+The tool then returns, instead of an image path:
 
 ```
-renderShapeScript needs Playwright's Chromium, which is not installed.
-Run `yarn ensure:playwright-browsers` in the MulmoClaude checkout
-(or `npx playwright install chromium`), then retry.
+renderShapeScript needs Puppeteer's headless Chromium, which this host does
+not have. Run `npx puppeteer browsers install chrome`, then retry.
 ```
 
 What to do:
 
-1. Tell the user the one command above, and that it is a one-time
-   ~150 MB browser download.
+1. Tell the user the one command above.
 2. Do NOT retry the call — nothing about the model changed, so the
    second attempt fails identically.
 3. Carry on with `presentShapeScript`, which needs no browser: it

@@ -88,6 +88,10 @@ const editableScript = ref(props.selectedResult.data?.script ?? "");
 const viewport = ref<HTMLDivElement | null>(null);
 const parseError = ref<string | null>(null);
 const saveError = ref<string | null>(null);
+/** Bumped by every operation that establishes what the source now IS, so an
+ *  older in-flight read can tell that it has been superseded. Not a ref: no
+ *  template reads it, and reactivity would only invite a watcher. */
+let sourceGeneration = 0;
 const showWireframe = ref(false);
 const showGrid = ref(true);
 
@@ -129,8 +133,14 @@ onMounted(() => {
 async function refreshFromDisk(): Promise<void> {
   const filePath = props.selectedResult.data?.filePath;
   if (!filePath) return;
+  // The read is in flight while the user can still hit Apply. Without this
+  // token a load that started BEFORE the save resolves after it, and the
+  // pre-save script is emitted over the freshly-written one — the edit
+  // silently reverts in the session (CodeRabbit on #3056).
+  const token = ++sourceGeneration;
   try {
     const { script } = await dispatch({ kind: "loadShape", path: filePath }, readLoadShapeResult);
+    if (token !== sourceGeneration) return;
     if (script === props.selectedResult.data?.script) return;
     editableScript.value = script;
     emit("updateResult", { ...props.selectedResult, data: { script, filePath } });
@@ -387,6 +397,7 @@ async function applyScript() {
   // render a script the next `loadShape` cannot find. A host with no file
   // layer leaves `filePath` unset and the result stays the only copy.
   const filePath = props.selectedResult.data?.filePath;
+  const token = ++sourceGeneration;
   if (filePath) {
     try {
       await dispatch({ kind: "saveShape", path: filePath, script }, readSaveShapeResult);
@@ -395,6 +406,9 @@ async function applyScript() {
       return;
     }
   }
+  // Another apply (or a refresh) landed while this one was writing — that one
+  // owns the result now.
+  if (token !== sourceGeneration) return;
   saveError.value = null;
 
   // Update the result (preserve existing viewState); the watch re-renders.

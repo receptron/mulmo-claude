@@ -3,9 +3,14 @@
 // The model is built headlessly with the plugin's own converter (so what is
 // rendered is what `presentShapeScript` validated), handed to a headless
 // Chromium as `toJSON()`, and screenshotted from several angles onto one
-// contact sheet. Chromium is Playwright's, which is a DEV dependency: an
-// npm-installed host has no browser, and this module says so in a form the
-// agent can act on rather than failing obscurely.
+// contact sheet.
+//
+// The browser is Puppeteer's — the same one `server/api/routes/pdf.ts` already
+// drives, and a production dependency of the launcher, so an npm-installed host
+// can render without installing anything. It is still imported lazily and
+// failure is still reported as an install hint rather than a crash: a host that
+// set `PUPPETEER_SKIP_DOWNLOAD`, or a sandbox that cannot spawn a browser, has
+// no Chromium and should hear why.
 
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
@@ -18,13 +23,15 @@ import { ONE_SECOND_MS } from "../time.js";
 import { buildRenderPage, type ViewAngle } from "./shapeScriptPage.js";
 
 /** How long one contact sheet may take in the browser before we give up. The
- *  geometry budget already bounds the model; this bounds the rasterisation. */
-const RENDER_TIMEOUT_MS = 60 * ONE_SECOND_MS;
+ *  geometry budget already bounds the model; this bounds the rasterisation.
+ *  Exported because the MCP bridge has to outlast it — see the tool's
+ *  `bridgeTimeoutMs`. */
+export const RENDER_TIMEOUT_MS = 60 * ONE_SECOND_MS;
 
 /** The install step a missing browser needs. Repeated verbatim in
  *  `error-recovery.md` — the agent reads that file before asking the user. */
 export const CHROMIUM_HINT =
-  "renderShapeScript needs Playwright's Chromium, which is not installed. Run `yarn ensure:playwright-browsers` in the MulmoClaude checkout (or `npx playwright install chromium`), then retry. Everything else, including presentShapeScript, works without it.";
+  "renderShapeScript needs Puppeteer's headless Chromium, which this host does not have. Run `npx puppeteer browsers install chrome`, then retry. Everything else, including presentShapeScript, works without it.";
 
 export interface RenderShapeScriptOptions {
   script: string;
@@ -42,46 +49,48 @@ export class RenderUnavailableError extends Error {}
 
 const require = createRequire(import.meta.url);
 
-interface ChromiumLike {
+interface LauncherLike {
   launch: (options: object) => Promise<BrowserLike>;
 }
 
-/** Narrow the dynamically imported module rather than asserting it: the import
- *  is untyped by design (the package may not be installed at all), so a cast
- *  would be a claim about a value nothing checked. */
-function isChromium(value: unknown): value is ChromiumLike {
+/** Narrow the dynamically imported module rather than asserting it: a lazy
+ *  import is untyped, so a cast would be a claim about a value nothing checked. */
+function isLauncher(value: unknown): value is LauncherLike {
   return isRecord(value) && typeof value.launch === "function";
 }
 
-/** Playwright's chromium launcher, or null when the package is absent.
- *  Imported lazily: it is a dev dependency, so a static import would crash an
- *  npm-installed host at boot rather than when the tool is called. */
-async function loadChromium(): Promise<ChromiumLike | null> {
+/** Puppeteer's launcher, or null when it cannot be loaded at all. Imported
+ *  lazily rather than at module scope: pulling a browser driver into the graph
+ *  on every boot costs every other tool startup time for one optional feature. */
+async function loadLauncher(): Promise<LauncherLike | null> {
   try {
-    const playwright: unknown = await import("@playwright/test");
-    if (!isRecord(playwright)) return null;
-    return isChromium(playwright.chromium) ? playwright.chromium : null;
+    const puppeteer: unknown = await import("puppeteer");
+    if (isLauncher(puppeteer)) return puppeteer;
+    // ESM/CJS interop: the CJS build arrives as `{ default: … }`.
+    return isRecord(puppeteer) && isLauncher(puppeteer.default) ? puppeteer.default : null;
   } catch {
     return null;
   }
 }
 
-// The slice of Playwright's API this module uses. Declared structurally so the
-// dev-only package is never a compile-time dependency of the server build.
-interface RouteLike {
-  request: () => { url: () => string };
-  fulfill: (response: { status: number; contentType: string; body: string }) => Promise<unknown>;
+// The slice of Puppeteer's API this module uses. Declared structurally, so the
+// lazily-imported package is not a compile-time dependency of the server build
+// and the driver stays swappable.
+interface RequestLike {
+  url: () => string;
+  respond: (response: { status: number; contentType: string; body: string }) => Promise<unknown>;
   abort: () => Promise<unknown>;
 }
 interface PageLike {
-  route: (pattern: string, handler: (route: RouteLike) => Promise<unknown>) => Promise<unknown>;
+  setRequestInterception: (enabled: boolean) => Promise<unknown>;
+  setViewport: (viewport: { width: number; height: number }) => Promise<unknown>;
   goto: (url: string, options?: object) => Promise<unknown>;
-  on: (event: "pageerror", handler: (error: Error) => void) => void;
-  waitForFunction: (expression: string, arg?: unknown, options?: object) => Promise<unknown>;
+  on: ((event: "request", handler: (request: RequestLike) => void) => void) & ((event: "pageerror", handler: (error: Error) => void) => void);
+  waitForFunction: (expression: string, options?: object) => Promise<unknown>;
   evaluate: (expression: string) => Promise<unknown>;
 }
 interface BrowserLike {
-  newPage: (options?: object) => Promise<PageLike>;
+  newPage: () => Promise<PageLike>;
   close: () => Promise<void>;
 }
 
@@ -104,23 +113,33 @@ const RENDER_ORIGIN = "https://shapescript.invalid";
 const PAGE_URL = `${RENDER_ORIGIN}/render.html`;
 const THREE_URL = "./three.module.js";
 
-/** Serve the render page and three's build directory, and refuse everything
- *  else — a model can carry no URLs of its own, so any other request is a bug
- *  rather than a resource, and failing it closed keeps the render offline. */
+/** The body for one intercepted request, or null to refuse it. Only the page
+ *  itself and three's own build files are served: a model can carry no URLs, so
+ *  any other request is a bug rather than a resource, and failing closed is what
+ *  keeps the render offline. */
+async function assetFor(url: string, html: string, buildDir: string): Promise<{ contentType: string; body: string } | null> {
+  const name = path.posix.basename(new URL(url).pathname);
+  if (name === "render.html") return { contentType: "text/html; charset=utf-8", body: html };
+  if (!/^three[\w.-]*\.js$/.test(name)) return null;
+  return { contentType: "text/javascript; charset=utf-8", body: await readFile(path.join(buildDir, name), "utf-8") };
+}
+
+/** Answer the page's requests from disk. Puppeteer's interception is per-page
+ *  and synchronous in registration, so the handler resolves its own promise. */
 async function serveRenderAssets(page: PageLike, html: string): Promise<void> {
   const buildDir = path.dirname(threeModulePath());
-  await page.route(`${RENDER_ORIGIN}/**`, async (route: RouteLike) => {
-    const name = path.posix.basename(new URL(route.request().url()).pathname);
-    if (name === "render.html") {
-      await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
-      return;
-    }
-    if (/^three[\w.-]*\.js$/.test(name)) {
-      const body = await readFile(path.join(buildDir, name), "utf-8");
-      await route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body });
-      return;
-    }
-    await route.abort();
+  await page.setRequestInterception(true);
+  page.on("request", (request: RequestLike) => {
+    void (async () => {
+      // An aborted request whose page has already closed rejects; the render
+      // either finished (nothing left to serve) or failed for its own reason.
+      try {
+        const asset = request.url().startsWith(RENDER_ORIGIN) ? await assetFor(request.url(), html, buildDir) : null;
+        await (asset ? request.respond({ status: 200, ...asset }) : request.abort());
+      } catch {
+        // Nothing to do — the wait below reports the real failure.
+      }
+    })();
   });
 }
 
@@ -132,8 +151,8 @@ async function serveRenderAssets(page: PageLike, html: string): Promise<void> {
  * `presentShapeScript` returns) or the page never produces an image.
  */
 export async function renderShapeScriptSheet(options: RenderShapeScriptOptions): Promise<string> {
-  const chromium = await loadChromium();
-  if (!chromium) throw new RenderUnavailableError(CHROMIUM_HINT);
+  const launcher = await loadLauncher();
+  if (!launcher) throw new RenderUnavailableError(CHROMIUM_HINT);
 
   // Build + serialise before launching a browser: a bad script should cost a
   // parse, not a browser start.
@@ -145,12 +164,13 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
   try {
     // SwiftShader is Chromium's software GL: CI and headless servers have no
     // GPU, and without this the WebGL context creation fails outright.
-    browser = await chromium.launch({ args: ["--enable-unsafe-swiftshader", "--use-gl=swiftshader"] });
+    browser = await launcher.launch({ headless: true, args: ["--enable-unsafe-swiftshader", "--use-gl=swiftshader"] });
   } catch (err) {
     throw new RenderUnavailableError(`${CHROMIUM_HINT} (launch failed: ${errorMessage(err)})`);
   }
   try {
-    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 800, height: 600 });
     // A script error leaves `__shapeSheet` unset, and the wait below would then
     // report only a timeout. Surfacing the real message is the difference
     // between a diagnosable failure and a mystery.
@@ -159,7 +179,7 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
     await serveRenderAssets(page, html);
     await page.goto(PAGE_URL, { waitUntil: "load" });
     try {
-      await page.waitForFunction("typeof window.__shapeSheet === 'string'", undefined, { timeout: RENDER_TIMEOUT_MS });
+      await page.waitForFunction("typeof window.__shapeSheet === 'string'", { timeout: RENDER_TIMEOUT_MS });
     } catch (err) {
       throw new Error(pageErrors.length > 0 ? `the render page failed: ${pageErrors.join("; ")}` : errorMessage(err));
     }

@@ -56,17 +56,26 @@ export interface ArtifactRelPathParams {
   now?: Date;
   /** Include the `YYYY/MM` partition segment. Default true; stories opt out. */
   partitioned?: boolean;
+  /** Extra token appended after the timestamp, for callers that cannot accept a
+   *  same-millisecond collision (see the note on `buildArtifactRelPath`). */
+  suffix?: string;
 }
 
 /**
- * FileOps-relative artifact path: `<dir>[/YYYY/MM]/<slug>-<epochMs><ext>`. The
- * `<epochMs>` suffix keeps freshly-built filenames collision-free without a
- * random component. This is what `files.artifacts.write` takes; prefix it with
+ * FileOps-relative artifact path: `<dir>[/YYYY/MM]/<slug>-<epochMs>[-<suffix>]<ext>`.
+ * This is what `files.artifacts.write` takes; prefix it with
  * `toWorkspaceArtifactPath` for the workspace-relative form shown to the LLM.
+ *
+ * `<epochMs>` alone separates paths built at different times, but NOT two calls
+ * with the same title inside one millisecond — those produce the same name, and
+ * the second write silently replaces the first artifact. Pass `suffix` (a short
+ * random token, as `shapeArtifactPath` does) wherever concurrent callers can
+ * share a title.
  */
 export function buildArtifactRelPath(params: ArtifactRelPathParams): string {
-  const { dir, title, ext, fallback, now = new Date(), partitioned = true } = params;
-  const fileName = `${slugifyArtifact(title, fallback)}-${now.getTime()}${ext}`;
+  const { dir, title, ext, fallback, now = new Date(), partitioned = true, suffix } = params;
+  const stamp = suffix ? `${now.getTime()}-${suffix}` : `${now.getTime()}`;
+  const fileName = `${slugifyArtifact(title, fallback)}-${stamp}${ext}`;
   const segments = partitioned ? [dir, yearMonthUtc(now), fileName] : [dir, fileName];
   return segments.join("/");
 }
@@ -77,13 +86,19 @@ export function toWorkspaceArtifactPath(relPath: string): string {
 }
 
 /**
- * True when any `/`-segment of `value` is empty (`//`, leading/trailing slash),
- * `.`, or `..`. The lexical traversal / non-canonical guard every artifact path
- * check shares — equivalent to `path.posix.normalize(v) === v && !v.includes("..")`
- * — so a workspace-escape judgement can't drift between plugins.
+ * True when any `/` or `\`-separated segment of `value` is empty (`//`,
+ * leading/trailing slash), `.`, or `..`. The lexical traversal / non-canonical
+ * guard every artifact path check shares — so a workspace-escape judgement
+ * can't drift between plugins.
+ *
+ * Both separators, matching `classifyFilePath`: an artifact path is minted from
+ * a slug and so never contains a backslash, while `node:path` on Windows treats
+ * one as a separator. Splitting on `/` alone accepted
+ * `artifacts/shapes/..\..\secrets.shape` — canonical to this check, traversal
+ * to `path.join` (codex on #3056).
  */
 export function hasUnsafePathSegment(value: string): boolean {
-  return value.split("/").some((seg) => seg === "" || seg === "." || seg === "..");
+  return value.split(/[/\\]/).some((seg) => seg === "" || seg === "." || seg === "..");
 }
 
 // ── Presentable document paths (presentDocument / presentHtml `path`) ──

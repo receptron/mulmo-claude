@@ -49,14 +49,27 @@ async function readShapeSource(context: ShapeScriptExecuteContext, filePath: str
   return target.files.read(target.rel);
 }
 
+/** How many times a fresh path is re-minted before giving up. The random token
+ *  makes one collision already unlikely; more than a couple in a row means the
+ *  clock and the RNG are both stuck, which is not a case to keep looping on. */
+const MINT_ATTEMPTS = 5;
+
 /** Persist a new source under a fresh `artifacts/shapes/**` path. Returns the
- *  workspace-relative path, or undefined when the host has no file layer. */
+ *  workspace-relative path, or undefined when the host has no file layer.
+ *
+ *  The existence check is what makes "fresh" a promise rather than a hope:
+ *  `write` overwrites unconditionally, so a name that is already taken would
+ *  replace someone else's model silently. */
 async function saveShapeSource(context: ShapeScriptExecuteContext, script: string, title: string): Promise<string | undefined> {
   const artifacts = context.files?.artifacts;
   if (!artifacts) return undefined;
-  const { relPath, filePath } = shapeArtifactPath(title);
-  await artifacts.write(relPath, script);
-  return filePath;
+  for (let attempt = 0; attempt < MINT_ATTEMPTS; attempt++) {
+    const { relPath, filePath } = shapeArtifactPath(title);
+    if (await artifacts.exists(relPath)) continue;
+    await artifacts.write(relPath, script);
+    return filePath;
+  }
+  throw new Error("Could not allocate a free path under artifacts/shapes — try again with a different title");
 }
 
 /** Resolve the tool call's two argument shapes to one source + its file. */

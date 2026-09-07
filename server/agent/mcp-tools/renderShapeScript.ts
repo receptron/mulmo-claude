@@ -12,10 +12,11 @@ import path from "node:path";
 import { saveImage } from "../../utils/files/image-store.js";
 import { resolveByPath } from "../../utils/files/by-path.js";
 import { workspacePath } from "../../workspace/workspace.js";
-import { renderShapeScriptSheet, RenderUnavailableError } from "../../utils/render/shapeScriptRenderer.js";
+import { renderShapeScriptSheet, RenderUnavailableError, RENDER_TIMEOUT_MS } from "../../utils/render/shapeScriptRenderer.js";
 import type { ViewAngle } from "../../utils/render/shapeScriptPage.js";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
+import { ONE_SECOND_MS } from "../../utils/time.js";
 import type { McpTool } from "./index.js";
 
 const DEFAULT_AZIMUTH = 30;
@@ -140,6 +141,10 @@ export const renderShapeScript: McpTool = {
       required: [],
     },
   },
+  // Launching a browser and rasterising several views outlasts the bridge's
+  // 30 s default for external-API tools; without the headroom a render that was
+  // about to succeed is aborted in transit.
+  bridgeTimeoutMs: RENDER_TIMEOUT_MS + 30 * ONE_SECOND_MS,
   prompt:
     "Use renderShapeScript to CHECK a 3D model you wrote before presenting it — it saves a PNG and returns the path, which you then read to see what the model actually looks like. Fix what you see and re-render. Rendering needs a local headless browser; if it reports one is missing, say so and continue with presentShapeScript rather than retrying.",
   handler: async (args: Record<string, unknown>): Promise<string> => {

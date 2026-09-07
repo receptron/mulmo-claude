@@ -36,10 +36,11 @@ front" wrong. `azimuth` / `elevation` aim the camera, `zoom` multiplies the auto
 bounding-sphere framing (so one value means the same thing at any model scale), and
 `projection` switches to orthographic for judging proportions.
 
-Rendering drives Playwright's headless Chromium, which is a development dependency: an
-npm-installed host has no browser, and the tool then returns the install command instead of an
-image. `presentShapeScript` is unaffected — it never needed one. The recovery is documented in
-`error-recovery.md`, so the agent reads it rather than retrying.
+Rendering drives Puppeteer's headless Chromium — the browser the PDF export already uses, and a
+production dependency, so an npm-installed host renders without installing anything. A host that
+skipped the browser download, or a sandbox that cannot spawn one, gets the install command
+instead of an image; `presentShapeScript` is unaffected, since it never needed a browser. The
+recovery is documented in `error-recovery.md`, so the agent reads it rather than retrying.
 
 #### `@mulmoclaude/shapescript-plugin@1.0.1` — `presentShapeScript`: 3D visualizations from ShapeScript
 

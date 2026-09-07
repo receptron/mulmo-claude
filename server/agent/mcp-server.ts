@@ -539,7 +539,9 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   if (mcpTool) {
     const res = await postJson(`/api/mcp-tools/${name}`, args, {
       allowHttpError: true,
-      timeoutMs: MCP_TOOL_BRIDGE_TIMEOUT_MS,
+      // A tool whose own budget exceeds the shared 30 s says so on its
+      // definition; otherwise the external-API default applies.
+      timeoutMs: mcpTool.bridgeTimeoutMs ?? MCP_TOOL_BRIDGE_TIMEOUT_MS,
     });
     return formatMcpToolResponse(res);
   }
