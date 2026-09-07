@@ -1239,7 +1239,16 @@ export class Converter {
     if (Array.isArray(value) && typeof value[0] === "number") {
       return value as Color;
     }
-    return this.evaluator.evaluateToColor(value as Expression);
+    return this.requireFiniteColor(this.evaluator.evaluateToColor(value as Expression));
+  }
+
+  /** Colour channels get the same treatment as sizes and translations.
+   *  `new THREE.Color(Infinity, …)` throws nothing — it serialises as
+   *  `[null, null, null]`, so validation reported success and the browser was
+   *  handed a material it cannot draw. */
+  private requireFiniteColor<T extends readonly number[]>(channels: T): T {
+    if (!channels.every(Number.isFinite)) throw new Error("Expected finite color channels");
+    return channels;
   }
 
   private evaluateVector3OrColor(value: Expression): Vector3 {
@@ -1257,15 +1266,15 @@ export class Converter {
 
     if (typeof result === "number") {
       // Single value - use as grayscale
-      return [result, result, result];
+      return this.requireFiniteColor([result, result, result]);
     } else if (Array.isArray(result)) {
       // Tuple - ensure it's a 3-element vector
       if (result.length === 1) {
-        return [toNum(result[0]), toNum(result[0]), toNum(result[0])];
+        return this.requireFiniteColor([toNum(result[0]), toNum(result[0]), toNum(result[0])]);
       } else if (result.length === 2) {
-        return [toNum(result[0]), toNum(result[1]), 0];
+        return this.requireFiniteColor([toNum(result[0]), toNum(result[1]), 0]);
       } else if (result.length >= 3) {
-        return [toNum(result[0]), toNum(result[1]), toNum(result[2])];
+        return this.requireFiniteColor([toNum(result[0]), toNum(result[1]), toNum(result[2])]);
       }
     }
 

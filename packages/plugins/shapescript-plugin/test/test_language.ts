@@ -134,6 +134,12 @@ describe("geometry builders", () => {
   it("refuses a conversion that outruns the wall-clock budget", () => {
     assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
   });
+  it("refuses non-finite color channels, which THREE.Color accepts silently", () => {
+    for (const script of ["cube { color (1e308 * 1e308) }", "color (1e308 * 1e308) cube", "cube { color (1e308 * 1e308) 0 0 }"]) {
+      assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /finite color/, script);
+    }
+    withMesh("color 0.5 cube", (mesh) => assert.ok((mesh.material as THREE.MeshStandardMaterial).color.equals(new THREE.Color(0.5, 0.5, 0.5))));
+  });
   it("refuses a path whose accumulated coordinates overflow", () => {
     // Individually finite operands, but the pen is relative: `NaN` positions
     // reach the geometry and every later comparison against them is false.
