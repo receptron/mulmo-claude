@@ -94,6 +94,12 @@ const SHAPE_GEOMETRY_CURVE_SEGMENTS = 12;
 // scripts that would otherwise commit gigabytes.
 const EXTRUDE_VERTICES_PER_POINT = 4;
 
+// Below this the polygon a path encloses is a rounding error rather than a
+// shape: `ShapeGeometry` yields no triangles and `ExtrudeGeometry` no volume.
+// Small enough that a legitimately tiny model (a millimetre-scale profile)
+// still passes.
+const DEGENERATE_AREA = 1e-9;
+
 /** Distinguishes complexity refusals from syntax and geometry errors in the
  *  tool's diagnostic return value. */
 export class ShapeScriptLimitError extends Error {
@@ -283,6 +289,7 @@ export class Converter {
       case "path": {
         const shape = this.buildPath(node);
         this.chargePathEstimate(shape, SHAPE_GEOMETRY_CURVE_SEGMENTS);
+        this.requireEnclosedArea(shape, "path");
         const mesh = this.makeMesh(new THREE.ShapeGeometry(shape), this.createMaterial({ properties: {} }));
         this.applyCurrentTransform(mesh);
         return mesh;
@@ -851,6 +858,22 @@ export class Converter {
     transform.matrix.multiply(scaleMatrix);
   }
 
+  /** Refuse a contour that encloses nothing.
+   *
+   *  `ShapeGeometry` over a single `point` triangulates to zero triangles, and
+   *  `ExtrudeGeometry` over collinear points sweeps a ribbon with no volume —
+   *  both used to pass validation as a successful visualization and then
+   *  present an empty viewport, which is worse than a diagnostic naming the
+   *  path. Sampled at the same resolution the geometry will use, so a curve
+   *  that only looks flat at low detail is not rejected. */
+  private requireEnclosedArea(shape: THREE.Shape, command: string): THREE.Shape {
+    const points = shape.getPoints(SHAPE_GEOMETRY_CURVE_SEGMENTS);
+    if (points.length < 3 || Math.abs(THREE.ShapeUtils.area(points)) < DEGENERATE_AREA) {
+      throw new Error(`\`${command}\` needs a path that encloses an area — this one has fewer than three distinct points, or they are collinear`);
+    }
+    return shape;
+  }
+
   private convertExtrude(node: ExtrudeNode): THREE.Mesh {
     if (!node.path) {
       return this.buildFromChildren({ children: node.children ?? [], properties: node.properties }, (meshes) => {
@@ -861,7 +884,7 @@ export class Converter {
         return new THREE.ExtrudeGeometry(shapes, { depth: size[2] ?? 1, bevelEnabled: false, curveSegments: 1 });
       });
     }
-    const shape = this.buildPath(node.path);
+    const shape = this.requireEnclosedArea(this.buildPath(node.path), "extrude");
 
     // Get extrusion depth from size property
     const size = node.properties.size ? this.evaluateVector3(node.properties.size) : [1, 1, 1];
@@ -1120,6 +1143,7 @@ export class Converter {
       // Build the 2D shape, then a ShapeGeometry (flat 2D shape) from it
       const shape = this.buildPath(pathNode);
       this.chargePathEstimate(shape, SHAPE_GEOMETRY_CURVE_SEGMENTS);
+      this.requireEnclosedArea(shape, "fill");
       const geometry = new THREE.ShapeGeometry(shape);
       const mesh = this.makeMesh(geometry, this.createMaterial(node));
 

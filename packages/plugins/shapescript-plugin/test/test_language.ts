@@ -134,6 +134,17 @@ describe("geometry builders", () => {
   it("refuses a conversion that outruns the wall-clock budget", () => {
     assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
   });
+  it("refuses a degenerate inline path instead of presenting an empty mesh", () => {
+    for (const script of [
+      "fill path { point 0 0 }",
+      "fill path { point 0 0 point 1 0 }",
+      "extrude path { point 0 0 point 1 0 point 2 0 }",
+      "path { point 0 0 }",
+    ]) {
+      assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /encloses an area/, script);
+    }
+    withMesh("fill path { point 0 0 point 1 0 point 0 1 }", (mesh) => assert.ok(mesh.geometry.getAttribute("position").count >= 3));
+  });
   it("keeps nested builder transforms when used as CSG operands", () => {
     withMesh("union { group { translate 5 0 0 hull { cube cube { position 1 0 0 } } } }", (mesh) => {
       mesh.geometry.computeBoundingBox();
