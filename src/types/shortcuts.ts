@@ -14,6 +14,13 @@
 export const SHORTCUT_KINDS = ["collection", "feed"] as const;
 export type ShortcutKind = (typeof SHORTCUT_KINDS)[number];
 
+/** What MulmoClaude understands a shortcut to be — a SUBSET of what a stored
+ *  record may hold, not the whole of it.
+ *
+ *  `config/shortcuts.json` is shared with MulmoTerminal, so the file is the
+ *  union of every version of both apps that has written it and a record can
+ *  carry fields this build has never heard of. Those are carried through rather
+ *  than dropped (`unknownShortcutFields` below, #3055). */
 export interface Shortcut {
   /** Which route family — drives `router.push({ name: kind, ... })`. */
   kind: ShortcutKind;
@@ -32,6 +39,28 @@ export interface Shortcut {
  *  bare array) so the schema can grow without a migration. */
 export interface ShortcutsFile {
   shortcuts: Shortcut[];
+}
+
+/** The fields this build names. Decides what gets VALIDATED and rebuilt — not
+ *  what a stored record may contain. */
+export const KNOWN_SHORTCUT_KEYS: readonly (keyof Shortcut)[] = ["kind", "slug", "title", "icon", "color"];
+
+/** Everything in a stored record that this build does not name, to be spread
+ *  back UNDER the known fields so a validated value always wins.
+ *
+ *  Both apps rebuild every record they write, so a field only one of them names
+ *  is deleted by the other — silently, and visibly only to whoever opens the app
+ *  that lost it. `color` was exactly that (#2987 here, mulmoterminal#1993 the
+ *  other way). Naming each new field in both apps is a rule someone has to
+ *  remember; carrying the rest through is not.
+ *
+ *  Built with `Object.fromEntries` rather than by assignment: a key named
+ *  `__proto__` is a setter on `Object.prototype`, so assigning it re-parents the
+ *  object and drops the key from the JSON entirely. `fromEntries` defines an own
+ *  property, leaving it as ordinary data. */
+export function unknownShortcutFields(raw: Shortcut | Record<string, unknown>): Record<string, unknown> {
+  const entries: [string, unknown][] = Object.entries(raw);
+  return Object.fromEntries(entries.filter(([key]) => !KNOWN_SHORTCUT_KEYS.some((known) => known === key)));
 }
 
 /** True when two shortcuts target the same thing (the dedupe key). */

@@ -4,12 +4,14 @@
 // mutation queue — the bug it was extracted for was invisible in every test
 // that went through those.
 //
-// The shape is deliberately "rebuild from identity + fresh values", never
-// "patch the old entry": a spread of the existing shortcut carries fields the
-// live row has since DROPPED, so a removed accent colour survived forever and
-// re-triggered drift on every reconcile, rewriting the file each time (#2987).
+// Every field the INDEX owns is rebuilt from the fresh row, never patched onto
+// the old entry: a spread of the existing shortcut carries fields the live row
+// has since DROPPED, so a removed accent colour survived forever and re-
+// triggered drift on every reconcile, rewriting the file each time (#2987).
+// Fields NEITHER app names are the opposite case — nothing here is authoritative
+// about them, so they are carried through (#3055).
 
-import type { Shortcut, ShortcutKind } from "../types/shortcuts";
+import { unknownShortcutFields, type Shortcut, type ShortcutKind } from "../types/shortcuts";
 
 /** The authoritative fields an index row supplies for a pinned shortcut. */
 export interface ShortcutRefreshSource {
@@ -39,11 +41,20 @@ export function hasShortcutDrifted(entry: Shortcut, fresh: ShortcutRefreshSource
 /** The shortcut as the index says it should be: the pin's own identity
  *  (`kind`, `slug`) plus every index-owned field taken from `fresh`.
  *
- *  Built key by key rather than spread over `entry`, so a field the live row no
- *  longer carries is genuinely gone from the result. `hasShortcutDrifted` is
- *  then false on the next pass, which is what stops the rewrite loop. */
+ *  The index-owned fields are built key by key rather than spread over `entry`,
+ *  so one the live row no longer carries is genuinely gone from the result.
+ *  `hasShortcutDrifted` is then false on the next pass, which is what stops the
+ *  rewrite loop.
+ *
+ *  What `entry` carries BEYOND those is kept: `config/shortcuts.json` is shared
+ *  with MulmoTerminal, and an index here says nothing about a field only that
+ *  app writes — dropping it would delete it from the file on the next reconcile,
+ *  which is the server-side bug (#3055) arriving by another route. Drift is
+ *  judged on the index-owned fields alone, so a carried key never re-triggers
+ *  a write. */
 export function refreshShortcut(entry: Shortcut, fresh: ShortcutRefreshSource): Shortcut {
   return {
+    ...unknownShortcutFields(entry),
     kind: entry.kind,
     slug: entry.slug,
     title: fresh.title,
