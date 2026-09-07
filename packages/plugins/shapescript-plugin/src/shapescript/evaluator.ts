@@ -125,8 +125,9 @@ const builtInFunctions: Record<string, (...args: Value[]) => Value> = {
 
   trim: (s: Value) => String(s).trim(),
 
-  // Random (for procedural generation)
-  rand: () => Math.random(),
+  // `rand` is intercepted by the evaluator, which owns the seeded generator;
+  // the entry stays so `Unknown function` still lists it as known.
+  rand: () => 0,
 };
 
 // Accepts `undefined` so callers can index into a `Value[]` under
@@ -159,11 +160,36 @@ function toBoolean(value: Value): boolean {
   return false;
 }
 
+/** Seeds the generator behind `rnd` / `rand()` when a caller names none.
+ *
+ *  The same script is evaluated TWICE for one visualization — once on the
+ *  server, which validates it and reports the diagnostic, and again in the
+ *  browser, which renders it. With `Math.random()` behind `rnd` those two runs
+ *  can take different branches, so `if rnd < .5 { cube } else { … }` could
+ *  validate clean and then fail in the viewport, which is exactly the failure
+ *  the validation exists to prevent. A seeded generator makes both runs agree,
+ *  and re-rendering a model on every keystroke stops reshuffling it. */
+export const DEFAULT_RANDOM_SEED = 0x9e3779b9;
+
+/** mulberry32 — small, fast, and good enough for scattering shapes. */
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export class Evaluator {
   private symbols: SymbolTable;
+  private readonly random: () => number;
 
-  constructor(symbols?: SymbolTable) {
+  constructor(symbols?: SymbolTable, seed: number = DEFAULT_RANDOM_SEED) {
     this.symbols = symbols || new SymbolTable();
+    this.random = seededRandom(seed);
   }
 
   getSymbols(): SymbolTable {
@@ -191,7 +217,7 @@ export class Evaluator {
       case "identifier": {
         // Handle built-in random number generator
         if (expr.name === "rnd") {
-          return Math.random();
+          return this.random();
         }
 
         const value = this.symbols.get(expr.name);
@@ -339,6 +365,9 @@ export class Evaluator {
         // coerced to `false` — a silently skipped `if` branch instead of
         // "Unknown function".
         const name = expr.name.toLowerCase();
+        // `rand()` shares the seeded generator behind `rnd`, so it cannot be
+        // served from the shared function table.
+        if (name === "rand") return this.random();
         const func = Object.prototype.hasOwnProperty.call(builtInFunctions, name) ? builtInFunctions[name] : undefined;
         if (!func) {
           throw new Error(`Unknown function: ${expr.name}`);

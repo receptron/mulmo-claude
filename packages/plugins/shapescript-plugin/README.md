@@ -128,6 +128,11 @@ Unsupported commands and failed CSG operations return errors instead of silently
 substituting different geometry. As with other polygonal CSG engines, degenerate or
 self-intersecting inputs may fail.
 
+`rnd` and `rand()` draw from a seeded generator (`randomSeed`, default
+`DEFAULT_RANDOM_SEED`) rather than `Math.random()`: one script is evaluated twice — once
+on the server, which validates it, and again in the browser, which renders it — and an
+unseeded generator lets those two runs take different branches.
+
 Conversion limits cover nodes, loop/path work, detail, aggregate vertices (including CSG
 intermediates), and a coarse wall-clock budget checked between nodes — it refuses to start
 the next node once the budget is spent, but cannot interrupt one long boolean.

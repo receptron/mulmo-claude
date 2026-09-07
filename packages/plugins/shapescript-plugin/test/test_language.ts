@@ -145,6 +145,9 @@ describe("geometry builders", () => {
     }
     withMesh("fill path { point 0 0 point 1 0 point 0 1 }", (mesh) => assert.ok(mesh.geometry.getAttribute("position").count >= 3));
   });
+  it("lofts sections whose winding a mirroring transform reversed", () => {
+    withMesh("loft { square translate 0 0 2 scale -1 1 1 square }", (mesh) => assert.ok(Math.abs(volume(mesh) - 2) < 1e-5, `volume ${volume(mesh)}`));
+  });
   it("keeps nested builder transforms when used as CSG operands", () => {
     withMesh("union { group { translate 5 0 0 hull { cube cube { position 1 0 0 } } } }", (mesh) => {
       mesh.geometry.computeBoundingBox();
@@ -207,6 +210,22 @@ describe("expressions", () => {
     withMesh("cube { position -1 -2 -3 }", (mesh) => assert.deepEqual(mesh.position.toArray(), [-1, -2, -3]));
     withMesh("extrude path { point +0 +0 point +1 +0 point +0 +1 point -1 +0 }", (mesh) => assert.ok(Math.abs(volume(mesh) - 1) < 1e-5));
     withMesh("extrude path { point 0 0 point (1 + 2 * 3) 0 point 0 1 point -7 0 }", (mesh) => assert.ok(Math.abs(volume(mesh) - 7) < 1e-5));
+  });
+  it("evaluates `rnd` the same way twice, so validation and rendering agree", () => {
+    // The server validates the script and the browser renders it from source;
+    // an unseeded generator lets the two runs take different branches.
+    const positions = [0, 1].map(() => {
+      const group = astToThreeJS(parseShapeScript("for i in 1 to 5 { cube { position rnd rand() rnd } }"));
+      try {
+        const values: number[] = [];
+        group.traverse((object) => values.push(...object.position.toArray()));
+        return values;
+      } finally {
+        disposeObject3D(group);
+      }
+    });
+    assert.deepEqual(positions[0], positions[1]);
+    assert.ok(new Set(positions[0]).size > 3, "a seeded generator must still vary within one script");
   });
   it("short circuits boolean expressions", () => {
     withMesh("if 1 or missing { cube }", () => {});

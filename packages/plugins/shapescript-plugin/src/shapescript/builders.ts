@@ -67,11 +67,38 @@ function resample(ring: THREE.Vector3[], count: number): THREE.Vector3[] {
   });
 }
 
+/** The plane normal of a closed ring, by Newell's method — valid for any planar
+ *  polygon, and its SIGN is the ring's winding. */
+function ringNormal(ring: THREE.Vector3[]): THREE.Vector3 {
+  const normal = new THREE.Vector3();
+  for (let i = 0; i < ring.length; i++) {
+    const current = ring[i]!,
+      next = ring[(i + 1) % ring.length]!;
+    normal.x += (current.y - next.y) * (current.z + next.z);
+    normal.y += (current.z - next.z) * (current.x + next.x);
+    normal.z += (current.x - next.x) * (current.y + next.y);
+  }
+  return normal;
+}
+
+/** Make every ring wind the same way as the one before it.
+ *
+ *  The side quads connect vertex `i` of one ring to vertex `i` of the next, so
+ *  a section whose winding is reversed — which any mirroring transform does,
+ *  `scale -1 1 1` among them — stitches inside-out and its faces cancel the
+ *  rest, leaving a solid that encloses no volume and is then refused. */
+function alignWinding(rings: THREE.Vector3[][]): void {
+  for (let r = 1; r < rings.length; r++) {
+    if (ringNormal(rings[r]!).dot(ringNormal(rings[r - 1]!)) < 0) rings[r]!.reverse();
+  }
+}
+
 /** Straight interpolation between successive rings, with triangulated end caps. */
 export function loftGeometry(profiles: THREE.Vector3[][]): THREE.BufferGeometry {
   if (profiles.length < 2) throw new Error("Loft requires at least two cross-sections");
   const count = Math.max(...profiles.map((ring) => ring.length));
   const rings = profiles.map((ring) => resample(ring, count));
+  alignWinding(rings);
   const indices: number[] = [];
   for (let r = 0; r < rings.length - 1; r++) {
     for (let i = 0; i < count; i++) {

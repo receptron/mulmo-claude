@@ -47,6 +47,9 @@ export interface ConversionOptions {
   /** Hard ceiling on the wall-clock time one conversion may spend. See
    *  `DEFAULT_MAX_DURATION_MS`. */
   maxDurationMs?: number;
+  /** Seed for `rnd` / `rand()`. Defaults to `DEFAULT_RANDOM_SEED`, which is
+   *  what keeps server validation and browser rendering on the same branch. */
+  randomSeed?: number;
 }
 
 // Conversion runs synchronously on the browser's main thread, and the script is
@@ -135,7 +138,7 @@ export class Converter {
   constructor(options: ConversionOptions = {}) {
     this.options = options;
     this.symbols = new SymbolTable();
-    this.evaluator = new Evaluator(this.symbols);
+    this.evaluator = new Evaluator(this.symbols, options.randomSeed);
     // Initialize with identity transform
     this.pushTransform();
   }
