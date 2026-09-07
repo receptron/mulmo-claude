@@ -111,12 +111,7 @@ export class Converter {
     const group = new THREE.Group();
 
     try {
-      for (const node of nodes) {
-        const object = this.convertNode(node);
-        if (object) {
-          group.add(object);
-        }
-      }
+      this.addChildren(group, nodes);
     } catch (error) {
       // The ROOT is abandoned the same way a nested group is: the callers
       // assign it only once this returns, and both Vue surfaces catch the error
@@ -280,16 +275,21 @@ export class Converter {
     }
   }
 
+  /** Convert each child and add whatever it produced to `group`. Every block
+   *  form ends up doing exactly this, and jscpd was right that six copies of
+   *  the loop is five too many. */
+  private addChildren(group: THREE.Group, children: readonly SceneNode[]): void {
+    for (const child of children) {
+      const object = this.convertNode(child);
+      if (object) {
+        group.add(object);
+      }
+    }
+  }
+
   private convertBlock(node: { children: SceneNode[] }): THREE.Group {
     const group = new THREE.Group();
-    return this.inScope(group, () => {
-      for (const child of node.children) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
-    });
+    return this.inScope(group, () => this.addChildren(group, node.children));
   }
 
   private convertShape(node: ShapeNode): THREE.Mesh {
@@ -551,12 +551,7 @@ export class Converter {
         // converting, so it landed twice on every fallback shape.
         this.inScope(fallbackGroup, () => {
           this.currentTransform().matrix.identity();
-          for (const child of node.children) {
-            const object = this.convertNode(child);
-            if (object) {
-              fallbackGroup.add(object);
-            }
-          }
+          this.addChildren(fallbackGroup, node.children);
         });
       } catch (fallbackError) {
         // The rebuild can fail too — a budget refusal is the likely way, since
@@ -603,12 +598,7 @@ export class Converter {
           this.symbols.set(node.variable, iterationValue);
 
           // Convert body nodes - transforms accumulate across iterations
-          for (const bodyNode of node.body) {
-            const object = this.convertNode(bodyNode);
-            if (object) {
-              group.add(object);
-            }
-          }
+          this.addChildren(group, node.body);
         }
       } else {
         // for i in from to to
@@ -621,14 +611,9 @@ export class Converter {
         for (const i of iterations) {
           this.symbols.set(node.variable, i);
 
-          // Convert body nodes directly - no iteration sub-groups
-          // Transforms accumulate across iterations within the loop scope
-          for (const bodyNode of node.body) {
-            const object = this.convertNode(bodyNode);
-            if (object) {
-              group.add(object);
-            }
-          }
+          // Convert body nodes directly - no iteration sub-groups.
+          // Transforms accumulate across iterations within the loop scope.
+          this.addChildren(group, node.body);
         }
       }
     });
@@ -640,15 +625,7 @@ export class Converter {
     // Evaluated BEFORE the scope is pushed, as it always was.
     const condition = this.evaluator.evaluateToBoolean(node.condition);
 
-    return this.inScope(group, () => {
-      const body = condition ? node.thenBody : (node.elseBody ?? []);
-      for (const child of body) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
-    });
+    return this.inScope(group, () => this.addChildren(group, condition ? node.thenBody : (node.elseBody ?? [])));
   }
 
   private convertSwitch(node: SwitchNode): THREE.Group {
@@ -659,13 +636,7 @@ export class Converter {
 
     return this.inScope(group, () => {
       const matched = node.cases.find((caseNode) => caseNode.values.some((caseValue) => this.valuesEqual(switchValue, this.evaluator.evaluate(caseValue))));
-      const body = matched ? matched.body : (node.defaultCase ?? []);
-      for (const child of body) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
+      this.addChildren(group, matched ? matched.body : (node.defaultCase ?? []));
     });
   }
 
@@ -716,12 +687,7 @@ export class Converter {
       }
 
       // Convert the body
-      for (const child of body) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
+      this.addChildren(group, body);
     });
   }
 
@@ -1083,13 +1049,7 @@ export class Converter {
     // this group) or leave the scope frames behind.
     const group = new THREE.Group();
     return this.inScope(group, () => {
-      for (const child of node.children) {
-        const object = this.convertNode(child);
-        if (object) {
-          group.add(object);
-        }
-      }
-
+      this.addChildren(group, node.children);
       this.applyExplicitTransforms(group, node.properties);
       this.applyCurrentTransform(group);
     });

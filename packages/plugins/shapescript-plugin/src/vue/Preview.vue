@@ -80,19 +80,18 @@ function initPreview() {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
-
-    // Parse and add ShapeScript objects
-    const initialScript = props.result.data?.script;
-    if (!initialScript) return;
-    const ast = parseShapeScript(initialScript);
-    sceneGroup = astToThreeJS(ast, { wireframe: false });
-    scene.add(sceneGroup);
-
-    // Start slow rotation animation
-    animate();
   } catch (error) {
     console.error("Preview render error:", error);
+    return;
   }
+
+  // Content and the render loop are independent. `reloadScene` handles an
+  // empty script and swallows a parse error, and the loop starts either way —
+  // it used to return before `animate()` when the first script was empty or
+  // invalid, so a later valid one was added to a scene nothing ever rendered
+  // and the preview stayed blank for good.
+  reloadScene();
+  animate();
 }
 
 function animate() {
