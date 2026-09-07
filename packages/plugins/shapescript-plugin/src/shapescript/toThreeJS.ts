@@ -44,6 +44,9 @@ export interface ConversionOptions {
   /** Hard ceiling on the vertices one script may allocate in total. See
    *  `DEFAULT_MAX_VERTICES`. */
   maxVertices?: number;
+  /** Hard ceiling on the wall-clock time one conversion may spend. See
+   *  `DEFAULT_MAX_DURATION_MS`. */
+  maxDurationMs?: number;
 }
 
 // Conversion runs synchronously on the browser's main thread, and the script is
@@ -71,6 +74,15 @@ export const MAX_DETAIL = 256;
 // script that satisfies every other budget. This is the aggregate ceiling.
 // 2M vertices is a heavy scene that still renders; an order more does not.
 export const DEFAULT_MAX_VERTICES = 2_000_000;
+
+// The counting budgets bound what a script ALLOCATES, not how long it takes to
+// get there: CSG is superlinear in its operands, so a script well inside every
+// ceiling above can still occupy the thread for minutes — the browser's, or the
+// server's when `presentShapeScript` validates before returning. Checked
+// between nodes, so it is coarse by construction: it cannot interrupt one long
+// boolean, only refuse to start the next. Generous enough that no legible model
+// reaches it (the shipped samples convert in milliseconds).
+export const DEFAULT_MAX_DURATION_MS = 10_000;
 
 // `ShapeGeometry`'s own default when no `curveSegments` is passed. Named here
 // because the pre-flight estimate has to predict what the constructor will do.
@@ -108,6 +120,8 @@ export class Converter {
   private nodeCount = 0;
   /** Vertices allocated so far, checked against `maxVertices` on every mesh. */
   private vertexCount = 0;
+  /** When this conversion began, checked against `maxDurationMs` on every node. */
+  private readonly startedAt = Date.now();
 
   // Transform state stack for relative transforms
   private transformStack: TransformState[] = [];
@@ -147,6 +161,10 @@ export class Converter {
 
   private get maxVertices(): number {
     return this.options.maxVertices ?? DEFAULT_MAX_VERTICES;
+  }
+
+  private get maxDurationMs(): number {
+    return this.options.maxDurationMs ?? DEFAULT_MAX_DURATION_MS;
   }
 
   /** Charge an ESTIMATE before the allocation happens.
@@ -210,6 +228,9 @@ export class Converter {
     this.nodeCount += 1;
     if (this.nodeCount > this.maxNodes) {
       throw new ShapeScriptLimitError(`ShapeScript produced more than ${this.maxNodes} objects — reduce the loop counts or the nesting`);
+    }
+    if (Date.now() - this.startedAt > this.maxDurationMs) {
+      throw new ShapeScriptLimitError(`ShapeScript took longer than ${this.maxDurationMs}ms to build — simplify the model or use fewer boolean operations`);
     }
     switch (node.type) {
       case "shape":
@@ -463,14 +484,28 @@ export class Converter {
       const meshes: THREE.Mesh[] = [];
       try {
         for (const child of node.children) {
+          // A path is a 2D outline with no volume. Feeding a degenerate operand
+          // to the CSG evaluator yields garbage geometry or an internal throw,
+          // and the fallback that used to absorb that is gone — so refuse it
+          // with a message that names the fix.
+          if (child.type === "path") {
+            throw new Error("A `path` has no volume and cannot be a CSG operand — wrap it in `extrude`, `lathe` or `fill`");
+          }
           const object = this.convertNode(child);
-          if (object) scratch.push(object);
+          // `convertNode` returns null for the commands that only change state
+          // (`translate`, `color`, `define`, `detail`, …), so nothing may be
+          // read off it before this guard.
+          if (!object) continue;
+          scratch.push(object);
+          // Duck-typed rather than `instanceof`: a plugin bundle can load its
+          // own copy of three, and then the host's Mesh/Group fail every
+          // `instanceof` here while behaving exactly like one.
           if ((object as THREE.Mesh).isMesh) {
             // Clone the mesh to avoid modifying the original
             const clonedMesh = (object as THREE.Mesh).clone();
             clonedMesh.updateMatrixWorld(true);
             meshes.push(clonedMesh);
-          } else if (object instanceof THREE.Group) {
+          } else if ((object as THREE.Group).isGroup) {
             // Preserve parent transforms when flattening nested builder groups.
             object.updateMatrixWorld(true);
             object.traverse((obj) => {
@@ -1028,6 +1063,12 @@ export class Converter {
 
   private buildFromChildren(node: { children: SceneNode[]; properties: ShapeProperties }, build: (meshes: THREE.Mesh[]) => THREE.BufferGeometry): THREE.Mesh {
     const temporary = new THREE.Group();
+    // The operand meshes are charged as they are built — the budget has to hold
+    // while they exist — but they are disposed below and never enter the scene,
+    // so the charge is REFUNDED and only what `finishMesh` returns stays
+    // counted. Without this a script of a few `hull`s over detailed spheres
+    // trips the ceiling while the scene it draws is far beneath it.
+    const chargedBeforeOperands = this.vertexCount;
     let geometry: THREE.BufferGeometry;
     try {
       this.inScope(temporary, () => {
@@ -1042,6 +1083,7 @@ export class Converter {
       geometry = build(meshes);
     } finally {
       disposeObject3D(temporary);
+      this.vertexCount = chargedBeforeOperands;
     }
     return this.finishMesh(geometry, node);
   }

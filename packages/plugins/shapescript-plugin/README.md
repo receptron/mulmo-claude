@@ -128,8 +128,9 @@ Unsupported commands and failed CSG operations return errors instead of silently
 substituting different geometry. As with other polygonal CSG engines, degenerate or
 self-intersecting inputs may fail.
 
-Conversion limits cover nodes, loop/path work, detail, and aggregate vertices (including
-CSG intermediates). These bound model complexity; they are not a wall-clock timeout.
+Conversion limits cover nodes, loop/path work, detail, aggregate vertices (including CSG
+intermediates), and a coarse wall-clock budget checked between nodes — it refuses to start
+the next node once the budget is spent, but cannot interrupt one long boolean.
 
 ## Scripts
 

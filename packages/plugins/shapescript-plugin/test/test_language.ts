@@ -103,6 +103,37 @@ describe("geometry builders", () => {
       assert.equal(mesh.geometry.boundingBox?.max.x, 0.5);
     });
   });
+  it("keeps a state-only command as a CSG child, which produces no object", () => {
+    // `color`, `translate`, `define` and friends convert to null — reading a
+    // mesh flag off one used to throw a TypeError out of the CSG collector.
+    for (const script of ["difference { cube color 1 0 0 sphere }", "difference { cube translate 0.5 0 0 sphere }", "union { detail 8 cube }"]) {
+      withMesh(script, (mesh) => assert.ok(mesh.geometry.getAttribute("position")));
+    }
+  });
+  it("refuses a volumeless path as a CSG operand instead of feeding it to the evaluator", () => {
+    assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("difference { cube path { point 0 0 point 1 0 point 0 1 } }"))), /no volume/);
+  });
+  it("refunds the vertex budget for builder operands that never enter the scene", () => {
+    // Each `hull` builds its two spheres, charges them, then disposes them —
+    // they never reach the scene, so their charge must not accumulate. The
+    // budget here holds the 24,000 vertices this actually draws with room to
+    // spare, but not the ~8,800 of discarded operands on top of them.
+    const group = astToThreeJS(parseShapeScript("detail 20 for i in 1 to 10 { hull { sphere { position i 0 0 } sphere { position i 2 0 } } }"), {
+      maxVertices: 30_000,
+    });
+    try {
+      let vertices = 0;
+      group.traverse((object) => {
+        vertices += (object as THREE.Mesh).geometry?.getAttribute("position")?.count ?? 0;
+      });
+      assert.equal(vertices, 24_000);
+    } finally {
+      disposeObject3D(group);
+    }
+  });
+  it("refuses a conversion that outruns the wall-clock budget", () => {
+    assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
+  });
   it("keeps nested builder transforms when used as CSG operands", () => {
     withMesh("union { group { translate 5 0 0 hull { cube cube { position 1 0 0 } } } }", (mesh) => {
       mesh.geometry.computeBoundingBox();
@@ -157,6 +188,14 @@ describe("expressions", () => {
     withMesh("extrude path { define edge 1 point 0 0 for i in 1 to 4 { point edge 0 rotate 0.25 } }", (mesh) => {
       assert.ok(Math.abs(volume(mesh) - 1) < 1e-5);
     });
+  });
+  it("distinguishes signed tuple components from binary arithmetic", () => {
+    for (const vector of ["1 +2 3", "+1 +2 +3", "(1 +2 +3)", "1 (1 + 1) (1+2)"]) {
+      withMesh(`cube { position ${vector} }`, (mesh) => assert.deepEqual(mesh.position.toArray(), [1, 2, 3]));
+    }
+    withMesh("cube { position -1 -2 -3 }", (mesh) => assert.deepEqual(mesh.position.toArray(), [-1, -2, -3]));
+    withMesh("extrude path { point +0 +0 point +1 +0 point +0 +1 point -1 +0 }", (mesh) => assert.ok(Math.abs(volume(mesh) - 1) < 1e-5));
+    withMesh("extrude path { point 0 0 point (1 + 2 * 3) 0 point 0 1 point -7 0 }", (mesh) => assert.ok(Math.abs(volume(mesh) - 7) < 1e-5));
   });
   it("short circuits boolean expressions", () => {
     withMesh("if 1 or missing { cube }", () => {});

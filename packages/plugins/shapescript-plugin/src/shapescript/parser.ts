@@ -498,6 +498,10 @@ class Lexer {
 
 // Parser
 export class Parser {
+  /** Whether the expression being parsed is one value of a whitespace-separated
+   *  list. See `withValueList`. */
+  private valueList = false;
+
   private tokens: Token[];
   private pos = 0;
 
@@ -559,6 +563,11 @@ export class Parser {
 
     while (true) {
       const token = this.current();
+      // A separated sign attached to its operand begins the next tuple value:
+      // `1 +2` means (1, 2), while `1+2` and `1 + 2` mean addition. Only where a
+      // whitespace-separated list is actually being read — inside call
+      // arguments, subscripts and loop bounds, ` -1` is arithmetic.
+      if (this.valueList && this.isStartOfNewValue()) break;
       const prec = this.getPrecedence(token.type);
 
       if (prec < minPrec) break;
@@ -594,12 +603,66 @@ export class Parser {
         expression = { type: "member", object: expression, member: String(token.value) };
       } else {
         this.advance();
-        const index = this.parseExpression();
+        const index = this.withValueList(false, () => this.parseExpression());
         this.expect(TokenType.RBRACKET);
         expression = { type: "subscript", object: expression, index };
       }
     }
     return expression;
+  }
+
+  /** The body of a `( … )`, with the opening paren already consumed.
+   *
+   *  Both a grouped expression and a space- or comma-separated tuple live here,
+   *  so its elements are read as a VALUE LIST: `(1 +2 +3)` is three components,
+   *  the same as `1 +2 +3` written without the parens. */
+  private parseParenthesized(): Expression {
+    const elements: Expression[] = [];
+    elements.push(this.parseExpression());
+
+    // Check if it's a comma-separated tuple
+    if (this.current().type === TokenType.COMMA) {
+      while (this.current().type === TokenType.COMMA) {
+        this.advance();
+        if (this.current().type === TokenType.RPAREN) break;
+        elements.push(this.parseExpression());
+      }
+    }
+    // Check if it's a space-separated tuple (e.g., "(1 2 3)")
+    else {
+      const nextToken = this.current();
+      const canBeVectorComponent =
+        nextToken.type === TokenType.NUMBER ||
+        nextToken.type === TokenType.IDENTIFIER ||
+        nextToken.type === TokenType.MINUS ||
+        nextToken.type === TokenType.PLUS ||
+        nextToken.type === TokenType.LPAREN;
+
+      if (canBeVectorComponent && nextToken.type !== TokenType.RPAREN) {
+        // Parse space-separated values
+        while (true) {
+          const currentToken = this.current();
+          if (
+            currentToken.type === TokenType.NUMBER ||
+            currentToken.type === TokenType.IDENTIFIER ||
+            currentToken.type === TokenType.MINUS ||
+            currentToken.type === TokenType.PLUS ||
+            currentToken.type === TokenType.LPAREN
+          ) {
+            elements.push(this.parseExpression());
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    this.expect(TokenType.RPAREN);
+
+    if (elements.length === 1 && elements[0] !== undefined) {
+      return elements[0]; // Single parenthesized expression
+    }
+    return { type: "tuple", elements }; // Tuple
   }
 
   private parseAtom(): Expression {
@@ -618,51 +681,7 @@ export class Parser {
     // Parenthesized expression or tuple
     if (token.type === TokenType.LPAREN) {
       this.advance();
-      const elements: Expression[] = [];
-      elements.push(this.parseExpression());
-
-      // Check if it's a comma-separated tuple
-      if (this.current().type === TokenType.COMMA) {
-        while (this.current().type === TokenType.COMMA) {
-          this.advance();
-          if (this.current().type === TokenType.RPAREN) break;
-          elements.push(this.parseExpression());
-        }
-      }
-      // Check if it's a space-separated tuple (e.g., "(1 2 3)")
-      else {
-        const nextToken = this.current();
-        const canBeVectorComponent =
-          nextToken.type === TokenType.NUMBER ||
-          nextToken.type === TokenType.IDENTIFIER ||
-          nextToken.type === TokenType.MINUS ||
-          nextToken.type === TokenType.LPAREN;
-
-        if (canBeVectorComponent && nextToken.type !== TokenType.RPAREN) {
-          // Parse space-separated values
-          while (true) {
-            const currentToken = this.current();
-            if (
-              currentToken.type === TokenType.NUMBER ||
-              currentToken.type === TokenType.IDENTIFIER ||
-              currentToken.type === TokenType.MINUS ||
-              currentToken.type === TokenType.LPAREN
-            ) {
-              elements.push(this.parseExpression());
-            } else {
-              break;
-            }
-          }
-        }
-      }
-
-      this.expect(TokenType.RPAREN);
-
-      if (elements.length === 1 && elements[0] !== undefined) {
-        return elements[0]; // Single parenthesized expression
-      } else {
-        return { type: "tuple", elements }; // Tuple
-      }
+      return this.withValueList(true, () => this.parseParenthesized());
     }
 
     // Number literal
@@ -694,15 +713,17 @@ export class Parser {
         this.advance();
         const args: Expression[] = [];
 
-        if (this.current().type !== TokenType.RPAREN) {
-          args.push(this.parseExpression());
-
-          while (this.current().type === TokenType.COMMA) {
-            this.advance();
-            if (this.current().type === TokenType.RPAREN) break;
+        this.withValueList(false, () => {
+          if (this.current().type !== TokenType.RPAREN) {
             args.push(this.parseExpression());
+
+            while (this.current().type === TokenType.COMMA) {
+              this.advance();
+              if (this.current().type === TokenType.RPAREN) break;
+              args.push(this.parseExpression());
+            }
           }
-        }
+        });
 
         this.expect(TokenType.RPAREN);
 
@@ -796,6 +817,10 @@ export class Parser {
   // Parse vector or expression
   // Handles both: "x y z" (space-separated) and "(x, y, z)" (tuple)
   private parseVectorOrExpression(): Expression {
+    return this.withValueList(true, () => this.parseValueList());
+  }
+
+  private parseValueList(): Expression {
     const first = this.parseExpression();
 
     // Check if there are more expressions following (space-separated values)
@@ -809,6 +834,7 @@ export class Parser {
       (nextToken.type === TokenType.NUMBER ||
         nextToken.type === TokenType.IDENTIFIER ||
         nextToken.type === TokenType.MINUS ||
+        nextToken.type === TokenType.PLUS ||
         nextToken.type === TokenType.LPAREN) &&
       !isCustomShapeInvocation;
 
@@ -827,6 +853,7 @@ export class Parser {
           (currentToken.type === TokenType.NUMBER ||
             currentToken.type === TokenType.IDENTIFIER ||
             currentToken.type === TokenType.MINUS ||
+            currentToken.type === TokenType.PLUS ||
             currentToken.type === TokenType.LPAREN) &&
           !isCustomShape
         ) {
@@ -1284,121 +1311,34 @@ export class Parser {
     return { type: builderType, children, properties };
   }
 
-  private parsePathValue(): Expression {
-    // Parse a single value for path commands
-    // Operators bind regardless of whitespace (e.g., "1 / 5" is one value)
-    // Space-separated non-operators are separate values (e.g., "0 radius 2" is three values)
-    let left = this.parsePathPrimary();
-
-    // Continue parsing operators to build up the expression
-    while (true) {
-      const token = this.current();
-
-      // Check for binary operators
-      if (
-        token.type === TokenType.STAR ||
-        token.type === TokenType.DIVIDE ||
-        token.type === TokenType.PERCENT ||
-        token.type === TokenType.PLUS ||
-        (token.type === TokenType.MINUS && !this.isStartOfNewValue())
-      ) {
-        const operator = this.tokenTypeToOperator(token.type);
-        if (!operator) break;
-        this.advance();
-        const right = this.parsePathPrimary();
-        left = {
-          type: "binary",
-          operator,
-          left,
-          right,
-        };
-      } else {
-        break;
-      }
+  /** Run `parse` with the tuple-value break of `isStartOfNewValue` enabled or
+   *  suppressed. Whitespace-separated value lists — property values, path
+   *  values, the inside of a `( … )` — read ` -1` as the NEXT value; call
+   *  arguments, subscripts and `for … to …` bounds are ordinary arithmetic. */
+  private withValueList<T>(enabled: boolean, parse: () => T): T {
+    const previous = this.valueList;
+    this.valueList = enabled;
+    try {
+      return parse();
+    } finally {
+      this.valueList = previous;
     }
+  }
 
-    return left;
+  /** Whether the current token can begin another value of a path command, so
+   *  `point +1 +0` and `point -1 0` both read as two values. */
+  private startsPathValue(): boolean {
+    const type = this.current().type;
+    return type === TokenType.NUMBER || type === TokenType.MINUS || type === TokenType.PLUS || type === TokenType.IDENTIFIER || type === TokenType.LPAREN;
   }
 
   private isStartOfNewValue(): boolean {
-    // Check if current MINUS token starts a new negative number value
-    // vs being a subtraction operator
     const token = this.current();
-    if (token.type !== TokenType.MINUS) return false;
-
-    // If there's preceding whitespace and next is a number, it's likely a new value
-    return (
-      !!token.precedingWhitespace &&
-      (this.peek().type === TokenType.NUMBER || this.peek().type === TokenType.IDENTIFIER || this.peek().type === TokenType.LPAREN)
-    );
+    return (token.type === TokenType.MINUS || token.type === TokenType.PLUS) && !!token.precedingWhitespace && !this.peek().precedingWhitespace;
   }
 
-  private parsePathPrimary(): Expression {
-    const token = this.current();
-
-    // Handle parenthesized expressions - these can contain full expressions with spaces
-    if (token.type === TokenType.LPAREN) {
-      this.advance();
-      const expr = this.parseExpression();
-      this.expect(TokenType.RPAREN);
-      return expr;
-    }
-
-    // Handle unary minus (negative numbers)
-    if (token.type === TokenType.MINUS) {
-      this.advance();
-      return {
-        type: "unary",
-        operator: "-",
-        operand: this.parsePathPrimary(),
-      };
-    }
-
-    // Handle numbers
-    if (token.type === TokenType.NUMBER) {
-      const value = token.value as number;
-      this.advance();
-      return {
-        type: "number",
-        value,
-      };
-    }
-
-    // Handle identifiers (variables) and function calls
-    if (token.type === TokenType.IDENTIFIER) {
-      const name = token.value as string;
-      this.advance();
-
-      // Function call: only if '(' immediately follows with NO space
-      if (this.current().type === TokenType.LPAREN && !this.current().precedingWhitespace) {
-        this.advance();
-        const args: Expression[] = [];
-
-        if (this.current().type !== TokenType.RPAREN) {
-          args.push(this.parseExpression());
-          while (this.current().type === TokenType.COMMA) {
-            this.advance();
-            args.push(this.parseExpression());
-          }
-        }
-
-        this.expect(TokenType.RPAREN);
-
-        return {
-          type: "call",
-          name,
-          args,
-        };
-      }
-
-      // Simple identifier
-      return {
-        type: "identifier",
-        name,
-      };
-    }
-
-    throw new ParseError(`Expected path value, got ${token.type}`, token.line, token.column);
+  private parsePathValue(): Expression {
+    return this.withValueList(true, () => this.parseExpression());
   }
 
   private parsePath(): PathNode {
@@ -1432,12 +1372,7 @@ export class Parser {
           const x = this.parsePathValue();
           // Y is optional - defaults to 0 if not provided
           let y: Expression = { type: "number", value: 0 };
-          if (
-            this.current().type === TokenType.NUMBER ||
-            this.current().type === TokenType.MINUS ||
-            this.current().type === TokenType.IDENTIFIER ||
-            this.current().type === TokenType.LPAREN
-          ) {
+          if (this.startsPathValue()) {
             y = this.parsePathValue();
           }
           commands.push({ type: "point", x, y });
@@ -1453,21 +1388,11 @@ export class Parser {
           let controlY: Expression | undefined;
 
           // Check if there's a potential third value (control point x)
-          if (
-            this.current().type === TokenType.NUMBER ||
-            this.current().type === TokenType.MINUS ||
-            this.current().type === TokenType.IDENTIFIER ||
-            this.current().type === TokenType.LPAREN
-          ) {
+          if (this.startsPathValue()) {
             controlX = this.parsePathValue();
 
             // Try to parse fourth value (control point y)
-            if (
-              this.current().type === TokenType.NUMBER ||
-              this.current().type === TokenType.MINUS ||
-              this.current().type === TokenType.IDENTIFIER ||
-              this.current().type === TokenType.LPAREN
-            ) {
+            if (this.startsPathValue()) {
               controlY = this.parsePathValue();
             }
           }
@@ -1528,12 +1453,7 @@ export class Parser {
                 const x = this.parsePathValue();
                 // Y is optional - defaults to 0 if not provided
                 let y: Expression = { type: "number", value: 0 };
-                if (
-                  this.current().type === TokenType.NUMBER ||
-                  this.current().type === TokenType.MINUS ||
-                  this.current().type === TokenType.IDENTIFIER ||
-                  this.current().type === TokenType.LPAREN
-                ) {
+                if (this.startsPathValue()) {
                   y = this.parsePathValue();
                 }
                 bodyCommands.push({ type: "point", x, y });
@@ -1548,21 +1468,11 @@ export class Parser {
                 let controlY: Expression | undefined;
 
                 // Check if there's a potential third value (control point x)
-                if (
-                  this.current().type === TokenType.NUMBER ||
-                  this.current().type === TokenType.MINUS ||
-                  this.current().type === TokenType.IDENTIFIER ||
-                  this.current().type === TokenType.LPAREN
-                ) {
+                if (this.startsPathValue()) {
                   controlX = this.parsePathValue();
 
                   // Try to parse fourth value (control point y)
-                  if (
-                    this.current().type === TokenType.NUMBER ||
-                    this.current().type === TokenType.MINUS ||
-                    this.current().type === TokenType.IDENTIFIER ||
-                    this.current().type === TokenType.LPAREN
-                  ) {
+                  if (this.startsPathValue()) {
                     controlY = this.parsePathValue();
                   }
                 }
