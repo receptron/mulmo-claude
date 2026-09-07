@@ -53,10 +53,11 @@ function toShortcut(raw: unknown): Shortcut | null {
   };
 }
 
-/** Coerce arbitrary JSON into a clean `Shortcut[]`: drop malformed entries
- *  (bad kind / empty slug / non-string fields) and dedupe on `(kind, slug)`
- *  keeping the first occurrence. Exported for the route validator and unit
- *  tests — pure, no IO. */
+/** Coerce arbitrary JSON into a clean `Shortcut[]`: drop entries with an unknown
+ *  kind or a missing / non-string / empty slug — a non-string `title` or `icon`
+ *  is DEFAULTED rather than fatal — and dedupe on `(kind, slug)` keeping the
+ *  first occurrence. Exported for the route validator and unit tests — pure,
+ *  no IO. */
 export function normalizeShortcuts(input: unknown): Shortcut[] {
   if (!Array.isArray(input)) return [];
   const out: Shortcut[] = [];

@@ -42,8 +42,17 @@ export interface ShortcutsFile {
 }
 
 /** The fields this build names. Decides what gets VALIDATED and rebuilt — not
- *  what a stored record may contain. */
-export const KNOWN_SHORTCUT_KEYS: readonly (keyof Shortcut)[] = ["kind", "slug", "title", "icon", "color"];
+ *  what a stored record may contain.
+ *
+ *  Spelled as an exhaustive `Record<keyof Shortcut, true>` rather than a bare
+ *  list, so adding a field to `Shortcut` without naming it here is a COMPILE
+ *  error. As a list it would be a silent one: the new field would ride along as
+ *  an unknown key and never be validated — the class of mistake this helper
+ *  exists to remove. (MulmoTerminal's counterpart is a plain array.) */
+const KNOWN_SHORTCUT_FIELDS: Readonly<Record<keyof Shortcut, true>> = { kind: true, slug: true, title: true, icon: true, color: true };
+
+/** Those names as plain keys — what a stored record is filtered against. */
+export const KNOWN_SHORTCUT_KEYS: readonly string[] = Object.keys(KNOWN_SHORTCUT_FIELDS);
 
 /** Everything in a stored record that this build does not name, to be spread
  *  back UNDER the known fields so a validated value always wins.
@@ -60,7 +69,7 @@ export const KNOWN_SHORTCUT_KEYS: readonly (keyof Shortcut)[] = ["kind", "slug",
  *  property, leaving it as ordinary data. */
 export function unknownShortcutFields(raw: Shortcut | Record<string, unknown>): Record<string, unknown> {
   const entries: [string, unknown][] = Object.entries(raw);
-  return Object.fromEntries(entries.filter(([key]) => !KNOWN_SHORTCUT_KEYS.some((known) => known === key)));
+  return Object.fromEntries(entries.filter(([key]) => !KNOWN_SHORTCUT_KEYS.includes(key)));
 }
 
 /** True when two shortcuts target the same thing (the dedupe key). */
