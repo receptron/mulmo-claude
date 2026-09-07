@@ -134,6 +134,16 @@ describe("geometry builders", () => {
   it("refuses a conversion that outruns the wall-clock budget", () => {
     assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
   });
+  it("refuses a lathe profile that samples to nothing", () => {
+    for (const script of [
+      "lathe path { point 1e308 0 curve 0 1 1e308 0 }",
+      "lathe path { point 0 0 point 0 1 point 0 2 }",
+      "lathe path { point 1 0 point 1 0 }",
+    ]) {
+      assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /overflow|axis of rotation/, script);
+    }
+    withMesh("lathe path { point 0.5 0 curve 1 1 1 0 point 0 2 }", (mesh) => assert.ok(mesh.geometry.getAttribute("position").count > 0));
+  });
   it("refuses a solid whose extent is zero in some dimension", () => {
     for (const script of [
       "sphere { size 0 }",

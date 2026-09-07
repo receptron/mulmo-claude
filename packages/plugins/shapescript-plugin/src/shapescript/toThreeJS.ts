@@ -1014,6 +1014,11 @@ export class Converter {
             const cy = this.evaluateNumber(command.controlY);
             const rotatedCX = cx * cos - cy * sin;
             const rotatedCY = cx * sin + cy * cos;
+            // The pen itself can stay finite while the control point does not,
+            // and a curve sampled from one returns `NaN` coordinates.
+            if (!Number.isFinite(currentX + rotatedCX) || !Number.isFinite(currentY + rotatedCY)) {
+              throw new Error("Curve control point overflowed to a non-finite value");
+            }
             shape.quadraticCurveTo(currentX + rotatedCX, currentY + rotatedCY, currentX, currentY);
           } else {
             shape.lineTo(currentX, currentY);
@@ -1072,6 +1077,23 @@ export class Converter {
     return this.inFrame(() => this.buildLathe(node));
   }
 
+  /** A lathe profile is only a solid once it is SAMPLED.
+   *
+   *  `getPoints` interpolates the curves, so a control point that overflowed
+   *  reaches `LatheGeometry` as `NaN` however finite the commands looked, and a
+   *  profile lying entirely on the axis of rotation (every `x` at 0) sweeps
+   *  nothing at all — both validated clean and drew an empty viewport. */
+  private requireLatheProfile(points: readonly THREE.Vector2[]): void {
+    if (!points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))) {
+      throw new Error("`lathe` profile has non-finite coordinates — a curve control point or a path command overflowed");
+    }
+    const radius = Math.max(...points.map((point) => Math.abs(point.x)));
+    const height = Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y));
+    if (radius < DEGENERATE_AREA || height < DEGENERATE_AREA) {
+      throw new Error("`lathe` needs a profile with both radius and height — one on the axis of rotation sweeps nothing");
+    }
+  }
+
   private buildLathe(node: LatheNode): THREE.Object3D {
     // Lathe rotates a 2D profile around an axis to create a 3D shape.
     // In ShapeScript, the path defines the profile.
@@ -1097,6 +1119,7 @@ export class Converter {
     if (points.length < 2) {
       throw new Error("Lathe path must have at least 2 points");
     }
+    this.requireLatheProfile(points);
 
     // What `LatheGeometry` is about to allocate: one ring of `detail + 1`
     // vertices per profile point. Checked BEFORE the constructor runs, since by
