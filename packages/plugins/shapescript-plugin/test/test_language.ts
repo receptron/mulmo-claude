@@ -134,6 +134,26 @@ describe("geometry builders", () => {
   it("refuses a conversion that outruns the wall-clock budget", () => {
     assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
   });
+  it("refuses a solid whose extent is zero in some dimension", () => {
+    for (const script of [
+      "sphere { size 0 }",
+      "cube { size 0 }",
+      "cube { size 1 1 0 }",
+      "cylinder { height 0 }",
+      "cone { size 0 }",
+      "torus { innerRadius 0 }",
+    ]) {
+      assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /nonzero size/, script);
+    }
+    // Flat by definition, and one zero radius makes a cylinder a cone.
+    for (const script of ["square", "circle { size 0 }", "cylinder { radiusTop 0 }"]) {
+      withMesh(script, (mesh) => assert.ok(mesh.geometry.getAttribute("position").count > 0));
+    }
+  });
+  it("refuses a scope color that is not numeric, as the per-shape property already did", () => {
+    assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript('color "bad" cube'))), /numeric color/);
+    withMesh("color 1 0 0 cube", (mesh) => assert.equal((mesh.material as THREE.MeshStandardMaterial).color.getHexString(), "ff0000"));
+  });
   it("refuses non-finite color channels, which THREE.Color accepts silently", () => {
     for (const script of ["cube { color (1e308 * 1e308) }", "color (1e308 * 1e308) cube", "cube { color (1e308 * 1e308) 0 0 }"]) {
       assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /finite color/, script);

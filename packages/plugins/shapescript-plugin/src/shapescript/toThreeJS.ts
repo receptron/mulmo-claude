@@ -373,6 +373,19 @@ export class Converter {
     return this.finishMesh(this.createGeometry(node), node);
   }
 
+  /** A solid whose extent is zero in any dimension draws nothing.
+   *
+   *  `sphere { size 0 }` built a mesh with an empty bounding box, and
+   *  validation reported success over a viewport with no visible model —
+   *  the same blank result the diagnostics exist to replace. Planar
+   *  primitives (`square`, `circle`, `polygon`) are exempt: they are flat by
+   *  definition and fall back to a unit size of their own. */
+  private requireExtent(primitive: string, dimensions: readonly (number | undefined)[]): void {
+    if (dimensions.some((value) => !value)) {
+      throw new Error(`\`${primitive}\` needs a nonzero size in every dimension — this one encloses nothing`);
+    }
+  }
+
   private createGeometry(node: ShapeNode): THREE.BufferGeometry {
     let size: Vector3 = [1, 1, 1];
 
@@ -387,27 +400,33 @@ export class Converter {
 
     switch (node.primitive) {
       case "cube":
+        this.requireExtent("cube", size);
         return new THREE.BoxGeometry(size[0], size[1], size[2]);
 
       case "sphere":
+        this.requireExtent("sphere", size);
         return new THREE.SphereGeometry(1, this.detailLevel, this.detailLevel).scale(...size);
 
       case "cylinder": {
         const radiusTop = node.properties.radiusTop ? this.evaluateNumber(node.properties.radiusTop) : size[0];
         const radiusBottom = node.properties.radiusBottom ? this.evaluateNumber(node.properties.radiusBottom) : size[0];
         const height = node.properties.height ? this.evaluateNumber(node.properties.height) : size[1];
+        // One radius may be zero — that is a cone, not a degenerate cylinder.
+        this.requireExtent("cylinder", [radiusTop || radiusBottom, height]);
         return new THREE.CylinderGeometry(radiusTop, radiusBottom, height, this.detailLevel);
       }
 
       case "cone": {
         const radius = size[0];
         const height = node.properties.height ? this.evaluateNumber(node.properties.height) : size[1];
+        this.requireExtent("cone", [radius, height]);
         return new THREE.ConeGeometry(radius, height, this.detailLevel);
       }
 
       case "torus": {
         const outerRadius = node.properties.outerRadius ? this.evaluateNumber(node.properties.outerRadius) : size[0];
         const innerRadius = node.properties.innerRadius ? this.evaluateNumber(node.properties.innerRadius) : 0.4;
+        this.requireExtent("torus", [outerRadius, innerRadius]);
         return new THREE.TorusGeometry(outerRadius, innerRadius, Math.max(3, Math.floor(this.detailLevel / 2)), this.detailLevel);
       }
 
@@ -1255,18 +1274,21 @@ export class Converter {
     // This helper is used for color commands which can accept a single number or a tuple
     const result = this.evaluator.evaluate(value);
 
-    // Helper to convert Value to number
+    // Helper to convert Value to number. Strict, because the fallbacks it used
+    // to have made `color "bad" cube` render default grey and VALIDATE clean,
+    // while the identical `cube { color "bad" }` returned a diagnostic.
     const toNum = (v: Value | undefined): number => {
       if (typeof v === "number") return v;
       if (typeof v === "boolean") return v ? 1 : 0;
-      if (typeof v === "string") return parseFloat(v) || 0;
       if (Array.isArray(v) && v.length > 0) return toNum(v[0]);
-      return 0;
+      throw new Error("Expected numeric color channels");
     };
 
     if (typeof result === "number") {
       // Single value - use as grayscale
       return this.requireFiniteColor([result, result, result]);
+    } else if (typeof result === "boolean") {
+      return this.requireFiniteColor([toNum(result), toNum(result), toNum(result)]);
     } else if (Array.isArray(result)) {
       // Tuple - ensure it's a 3-element vector
       if (result.length === 1) {
@@ -1278,7 +1300,7 @@ export class Converter {
       }
     }
 
-    return [0.8, 0.8, 0.8]; // Default gray
+    throw new Error("Expected numeric color channels");
   }
 
   private valuesEqual(a: unknown, b: unknown): boolean {
