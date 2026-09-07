@@ -140,6 +140,7 @@ async function refreshFromDisk(): Promise<void> {
   const token = ++sourceGeneration;
   try {
     const { script } = await dispatch({ kind: "loadShape", path: filePath }, readLoadShapeResult);
+    // Superseded by an edit or an Apply while the read was in flight.
     if (token !== sourceGeneration) return;
     if (script === props.selectedResult.data?.script) return;
     editableScript.value = script;
@@ -376,8 +377,11 @@ function cleanup() {
 }
 
 function handleScriptEdit() {
-  // Just update the local state, don't apply yet
-  // User needs to click "Apply Changes" button
+  // The edit itself is not applied — that is the Apply button's job. What this
+  // does do is take ownership of the buffer: a `loadShape` started at mount can
+  // still be in flight, and without invalidating it here the disk copy lands on
+  // top of whatever the user has just typed (codex on #3056).
+  sourceGeneration++;
 }
 
 async function applyScript() {

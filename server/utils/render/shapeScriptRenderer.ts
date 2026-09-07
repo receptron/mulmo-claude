@@ -23,10 +23,21 @@ import { ONE_SECOND_MS } from "../time.js";
 import { buildRenderPage, type ViewAngle } from "./shapeScriptPage.js";
 
 /** How long one contact sheet may take in the browser before we give up. The
- *  geometry budget already bounds the model; this bounds the rasterisation.
- *  Exported because the MCP bridge has to outlast it — see the tool's
- *  `bridgeTimeoutMs`. */
+ *  geometry budget already bounds the model; this bounds the rasterisation. */
 export const RENDER_TIMEOUT_MS = 60 * ONE_SECOND_MS;
+
+/** How long the browser itself may take to start. Set explicitly rather than
+ *  left to Puppeteer's own 30 s default, so the total below is derived from
+ *  numbers this file controls instead of one it would silently inherit. */
+export const LAUNCH_TIMEOUT_MS = 30 * ONE_SECOND_MS;
+
+/** Worst case for one call, launch plus render. The MCP bridge must outlast
+ *  THIS, not just the render — a slow launch followed by a full render is
+ *  inside budget, and a bridge sized to the render alone aborts it in transit
+ *  while the server carries on and saves an image nobody is waiting for
+ *  (CodeRabbit on #3056). Callers add their own headroom for the work either
+ *  side of it: serialising the scene, and writing the PNG. */
+export const RENDER_BUDGET_MS = LAUNCH_TIMEOUT_MS + RENDER_TIMEOUT_MS;
 
 /** The install step a missing browser needs. Repeated verbatim in
  *  `error-recovery.md` — the agent reads that file before asking the user. */
@@ -116,9 +127,21 @@ const THREE_URL = "./three.module.js";
 /** The body for one intercepted request, or null to refuse it. Only the page
  *  itself and three's own build files are served: a model can carry no URLs, so
  *  any other request is a bug rather than a resource, and failing closed is what
- *  keeps the render offline. */
+ *  keeps the render offline.
+ *
+ *  The origin is compared as a parsed ORIGIN, never as a string prefix:
+ *  `https://shapescript.invalid.example.com/` starts with the origin text but
+ *  is a different — and real — host (CodeQL js/incomplete-url-substring-sanitization
+ *  on #3056). */
 async function assetFor(url: string, html: string, buildDir: string): Promise<{ contentType: string; body: string } | null> {
-  const name = path.posix.basename(new URL(url).pathname);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== RENDER_ORIGIN) return null;
+  const name = path.posix.basename(parsed.pathname);
   if (name === "render.html") return { contentType: "text/html; charset=utf-8", body: html };
   if (!/^three[\w.-]*\.js$/.test(name)) return null;
   return { contentType: "text/javascript; charset=utf-8", body: await readFile(path.join(buildDir, name), "utf-8") };
@@ -134,7 +157,7 @@ async function serveRenderAssets(page: PageLike, html: string): Promise<void> {
       // An aborted request whose page has already closed rejects; the render
       // either finished (nothing left to serve) or failed for its own reason.
       try {
-        const asset = request.url().startsWith(RENDER_ORIGIN) ? await assetFor(request.url(), html, buildDir) : null;
+        const asset = await assetFor(request.url(), html, buildDir);
         await (asset ? request.respond({ status: 200, ...asset }) : request.abort());
       } catch {
         // Nothing to do — the wait below reports the real failure.
@@ -164,7 +187,11 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
   try {
     // SwiftShader is Chromium's software GL: CI and headless servers have no
     // GPU, and without this the WebGL context creation fails outright.
-    browser = await launcher.launch({ headless: true, args: ["--enable-unsafe-swiftshader", "--use-gl=swiftshader"] });
+    browser = await launcher.launch({
+      headless: true,
+      timeout: LAUNCH_TIMEOUT_MS,
+      args: ["--enable-unsafe-swiftshader", "--use-gl=swiftshader"],
+    });
   } catch (err) {
     throw new RenderUnavailableError(`${CHROMIUM_HINT} (launch failed: ${errorMessage(err)})`);
   }
