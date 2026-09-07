@@ -1,5 +1,8 @@
 import * as THREE from "three";
-import { Brush, Evaluator as CSGEvaluator, ADDITION, SUBTRACTION, INTERSECTION } from "three-bvh-csg";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { loftGeometry, profileOf } from "./builders";
+import { Brush, Evaluator as CSGEvaluator, ADDITION, SUBTRACTION, INTERSECTION, HOLLOW_SUBTRACTION, HOLLOW_INTERSECTION } from "three-bvh-csg";
 import {
   SceneNode,
   ShapeNode,
@@ -79,9 +82,8 @@ const SHAPE_GEOMETRY_CURVE_SEGMENTS = 12;
 // scripts that would otherwise commit gigabytes.
 const EXTRUDE_VERTICES_PER_POINT = 4;
 
-/** Its own class so `convertCSG`'s fallback can rethrow it instead of swallowing
- *  it: catching a budget error there would rebuild the same runaway children as
- *  a plain group, which is the work the budget exists to refuse. */
+/** Distinguishes complexity refusals from syntax and geometry errors in the
+ *  tool's diagnostic return value. */
 export class ShapeScriptLimitError extends Error {
   constructor(message: string) {
     super(message);
@@ -100,6 +102,7 @@ export class Converter {
   private options: ConversionOptions;
   private evaluator: Evaluator;
   private symbols: SymbolTable;
+  private pathCommandCount = 0;
   private detailLevel: number = 32; // Default detail level for curved shapes
   /** Objects produced so far, checked against `maxNodes` on every node. */
   private nodeCount = 0;
@@ -189,7 +192,8 @@ export class Converter {
    *  The array used to be built up front, so an absurd bound exhausted memory
    *  before a single node existed and the budget below never got a turn. */
   private rangeIterations(from: number, to: number, step: number): number[] {
-    if (step === 0 || !Number.isFinite(step) || !Number.isFinite(from) || !Number.isFinite(to)) return [];
+    if (step === 0 || !Number.isFinite(step) || !Number.isFinite(from) || !Number.isFinite(to))
+      throw new Error("Loop bounds and step must be finite, with a nonzero step");
     const iterations: number[] = [];
     for (let i = from; step > 0 ? i <= to : i >= to; i += step) {
       if (iterations.length >= this.maxLoopIterations) {
@@ -255,9 +259,15 @@ export class Converter {
         return null;
       case "customShape":
         return this.convertCustomShape(node);
+      case "path": {
+        const shape = this.buildPath(node);
+        this.chargePathEstimate(shape, SHAPE_GEOMETRY_CURVE_SEGMENTS);
+        const mesh = this.makeMesh(new THREE.ShapeGeometry(shape), this.createMaterial({ properties: {} }));
+        this.applyCurrentTransform(mesh);
+        return mesh;
+      }
       default:
-        console.warn(`Unknown node type: ${(node as { type: string }).type}`);
-        return null;
+        throw new Error(`Unsupported command: ${(node as { type: string }).type}`);
     }
   }
 
@@ -314,18 +324,22 @@ export class Converter {
     return this.inScope(group, () => this.addChildren(group, node.children));
   }
 
+  private finishMesh(geometry: THREE.BufferGeometry, node: { properties: ShapeProperties }): THREE.Mesh {
+    let mesh: THREE.Mesh | undefined;
+    try {
+      mesh = this.makeMesh(geometry, this.createMaterial(node));
+      this.applyExplicitTransforms(mesh, node.properties);
+      this.applyCurrentTransform(mesh);
+      return mesh;
+    } catch (error) {
+      if (mesh) disposeObject3D(mesh);
+      else geometry.dispose();
+      throw error;
+    }
+  }
+
   private convertShape(node: ShapeNode): THREE.Mesh {
-    const geometry = this.createGeometry(node);
-    const material = this.createMaterial(node);
-    const mesh = this.makeMesh(geometry, material);
-
-    // Apply any property-specific transforms first (local)
-    this.applyExplicitTransforms(mesh, node.properties);
-
-    // Then apply the current scope transform so relative transforms compose correctly
-    this.applyCurrentTransform(mesh);
-
-    return mesh;
+    return this.finishMesh(this.createGeometry(node), node);
   }
 
   private createGeometry(node: ShapeNode): THREE.BufferGeometry {
@@ -345,7 +359,7 @@ export class Converter {
         return new THREE.BoxGeometry(size[0], size[1], size[2]);
 
       case "sphere":
-        return new THREE.SphereGeometry(size[0], this.detailLevel, this.detailLevel);
+        return new THREE.SphereGeometry(1, this.detailLevel, this.detailLevel).scale(...size);
 
       case "cylinder": {
         const radiusTop = node.properties.radiusTop ? this.evaluateNumber(node.properties.radiusTop) : size[0];
@@ -373,19 +387,18 @@ export class Converter {
 
       case "square": {
         const sideLength = size[0] || 1;
-        return new THREE.PlaneGeometry(sideLength, sideLength);
+        return new THREE.PlaneGeometry(sideLength, size[1] || sideLength);
       }
 
       case "polygon": {
-        // TODO: Support variable sides via properties
         const radius = size[0] || 1;
-        const sides = 6; // Default hexagon
+        const sides = node.properties.sides === undefined ? 6 : this.evaluateNumber(node.properties.sides);
+        if (!Number.isInteger(sides) || sides < 3 || sides > MAX_DETAIL) throw new Error(`Polygon sides must be an integer from 3 to ${MAX_DETAIL}`);
         return new THREE.CircleGeometry(radius, sides);
       }
 
       default:
-        console.warn(`Unknown primitive: ${node.primitive}`);
-        return new THREE.BoxGeometry(1, 1, 1);
+        throw new Error(`Unknown primitive: ${node.primitive}`);
     }
   }
 
@@ -424,7 +437,7 @@ export class Converter {
     // Save the transform state BEFORE entering block - CSG result will be positioned here
     const savedMatrix = this.currentTransform().matrix.clone();
 
-    // Declared outside the try so the fallback path below can free whatever had
+    // Declared outside the try so the error path can free whatever had
     // been built before the failure. Everything in here exists only to feed the
     // CSG evaluator — the children, their clones, the Brushes, and every
     // intermediate `evaluate()` result — and none of it ever enters the scene,
@@ -439,8 +452,7 @@ export class Converter {
       this.symbols.pushScope();
       this.pushTransform();
       // The matching pops live in the `finally` below, so a throw mid-collection
-      // unwinds the frames instead of leaving one behind for the fallback path
-      // (which pushes a scope of its own) to inherit.
+      // unwinds the frames before the error propagates to the caller.
 
       // Reset to identity for block's local coordinate space. The MATRIX only:
       // an enclosing `color` is not a coordinate, and clearing it made
@@ -453,16 +465,18 @@ export class Converter {
         for (const child of node.children) {
           const object = this.convertNode(child);
           if (object) scratch.push(object);
-          if (object instanceof THREE.Mesh) {
+          if ((object as THREE.Mesh).isMesh) {
             // Clone the mesh to avoid modifying the original
-            const clonedMesh = object.clone();
+            const clonedMesh = (object as THREE.Mesh).clone();
             clonedMesh.updateMatrixWorld(true);
             meshes.push(clonedMesh);
           } else if (object instanceof THREE.Group) {
-            // Extract meshes from group
+            // Preserve parent transforms when flattening nested builder groups.
+            object.updateMatrixWorld(true);
             object.traverse((obj) => {
-              if (obj instanceof THREE.Mesh) {
-                const clonedMesh = obj.clone();
+              if ((obj as THREE.Mesh).isMesh) {
+                const clonedMesh = (obj as THREE.Mesh).clone();
+                obj.matrixWorld.decompose(clonedMesh.position, clonedMesh.quaternion, clonedMesh.scale);
                 clonedMesh.updateMatrixWorld(true);
                 meshes.push(clonedMesh);
               }
@@ -509,6 +523,8 @@ export class Converter {
           scratch.push(a, b);
           const produced = csgEvaluator.evaluate(a, b, operation);
           scratch.push(produced);
+          this.chargeEstimate(produced.geometry.getAttribute("position")?.count ?? 0);
+          this.vertexCount += produced.geometry.getAttribute("position")?.count ?? 0;
           return produced;
         };
 
@@ -529,10 +545,35 @@ export class Converter {
             result = evaluate(aMinusB, bMinusA, ADDITION);
             break;
           }
-          case "stencil":
-            // Stencil keeps shape of first but 'paints' the intersecting areas
-            result = evaluate(result, brush, INTERSECTION);
+          case "stencil": {
+            // Split only A's surface. Solid subtraction would add unwanted
+            // cut faces inside A; hollow operations preserve its volume.
+            const outside = evaluate(result, brush, HOLLOW_SUBTRACTION);
+            const inside = evaluate(result, brush, HOLLOW_INTERSECTION);
+            inside.material = Array.isArray(brush.material) ? brush.material[0]! : brush.material;
+            inside.geometry.clearGroups();
+            inside.geometry.addGroup(0, inside.geometry.index?.count ?? inside.geometry.getAttribute("position").count, 0);
+            const parts = [outside, inside];
+            const geometries = parts.map((part) => part.geometry.clone().applyMatrix4(part.matrixWorld));
+            try {
+              const geometry = mergeGeometries(geometries);
+              if (!geometry) throw new Error("Could not combine stencil surfaces");
+              const materials: THREE.Material[] = [];
+              let offset = 0;
+              for (const part of parts) {
+                for (const group of part.geometry.groups) geometry.addGroup(offset + group.start, group.count, materials.length + (group.materialIndex ?? 0));
+                materials.push(...(Array.isArray(part.material) ? part.material : [part.material]));
+                offset += part.geometry.index?.count ?? part.geometry.getAttribute("position").count;
+              }
+              result = new Brush(geometry, materials);
+              scratch.push(result);
+              this.chargeEstimate(geometry.getAttribute("position").count);
+              this.vertexCount += geometry.getAttribute("position").count;
+            } finally {
+              geometries.forEach((geometry) => geometry.dispose());
+            }
             break;
+          }
         }
       }
 
@@ -553,47 +594,9 @@ export class Converter {
 
       return result;
     } catch (error) {
-      // A budget refusal is not a CSG failure — rebuilding the same children as
-      // a plain group would do exactly the work the budget refused. Nothing
-      // survives this path, so everything built before the refusal is freed:
-      // a rejected preview would otherwise leak whatever the earlier children
-      // had already allocated, once per attempt.
-      if (error instanceof ShapeScriptLimitError) {
-        disposeScratch(scratch, new THREE.Group());
-        throw error;
-      }
-      // Return original shapes as a group if CSG fails
-      const fallbackGroup = new THREE.Group();
-
-      try {
-        // Same scopes as the success path, for the same reason: the children
-        // must be built in the BLOCK's coordinate space, because `savedMatrix`
-        // — the enclosing transform — is applied to the group below. Pushing
-        // only a symbol scope left the parent transform active while
-        // converting, so it landed twice on every fallback shape.
-        this.inScope(fallbackGroup, () => {
-          this.currentTransform().matrix.identity();
-          this.addChildren(fallbackGroup, node.children);
-        });
-      } catch (fallbackError) {
-        // The rebuild can fail too — a budget refusal is the likely way, since
-        // the first pass already spent part of it. `inScope` frees the fallback
-        // group; the FIRST pass's operands are still ours to free, and there is
-        // no survivor to protect.
-        disposeScratch(scratch, new THREE.Group());
-        throw fallbackError;
-      }
-
-      // Apply saved transform to fallback group
-      fallbackGroup.applyMatrix4(savedMatrix);
-      fallbackGroup.updateMatrixWorld(true);
-
-      // Whatever had been built before the failure is unreachable now — the
-      // fallback rebuilds the children from scratch — so free it here too.
-      // Excluded by resource again, in case any of it is shared.
-      disposeScratch(scratch, fallbackGroup);
-
-      return fallbackGroup;
+      disposeScratch(scratch, new THREE.Group());
+      // A failed boolean must not silently display its uncombined operands.
+      throw error;
     }
   }
 
@@ -681,15 +684,13 @@ export class Converter {
     const definition = this.symbols.get(node.name);
 
     if (!definition || typeof definition !== "object" || !("type" in definition)) {
-      console.warn(`Custom shape '${node.name}' not found`);
-      return null;
+      throw new Error(`Unknown shape: ${node.name}`);
     }
 
     const defineNode = definition as unknown as DefineNode;
 
     if (!defineNode.body) {
-      console.warn(`Custom shape '${node.name}' has no body`);
-      return null;
+      throw new Error(`Custom shape '${node.name}' has no body`);
     }
 
     // Same scope handling as every other group builder: a body node that throws
@@ -803,6 +804,7 @@ export class Converter {
   private handleTranslateCommand(node: TranslateNode): void {
     const transform = this.currentTransform();
     const [x, y, z] = this.evaluateTranslateVector(node.value);
+    if (![x, y, z].every(Number.isFinite)) throw new Error("Expected finite translation components");
     const translationMatrix = new THREE.Matrix4().makeTranslation(x, y, z);
     transform.matrix.multiply(translationMatrix);
   }
@@ -815,8 +817,16 @@ export class Converter {
   }
 
   private convertExtrude(node: ExtrudeNode): THREE.Mesh {
-    // Build the 2D shape from the path
-    const shape = node.path ? this.buildPath(node.path) : new THREE.Shape([new THREE.Vector2(0, 0)]);
+    if (!node.path) {
+      return this.buildFromChildren({ children: node.children ?? [], properties: node.properties }, (meshes) => {
+        const shapes = meshes.map((mesh) => this.planarShape(mesh));
+        if (!shapes.length) throw new Error("Extrude requires a path or planar shape");
+        const size = node.properties.size ? this.evaluateVector3(node.properties.size) : [1, 1, 1];
+        for (const shape of shapes) this.chargePathEstimate(shape, 1, 12);
+        return new THREE.ExtrudeGeometry(shapes, { depth: size[2] ?? 1, bevelEnabled: false, curveSegments: 1 });
+      });
+    }
+    const shape = this.buildPath(node.path);
 
     // Get extrusion depth from size property
     const size = node.properties.size ? this.evaluateVector3(node.properties.size) : [1, 1, 1];
@@ -855,7 +865,14 @@ export class Converter {
     let penDown = false;
 
     const processCommand = (command: PathCommand) => {
+      if (++this.pathCommandCount > this.maxLoopIterations) throw new ShapeScriptLimitError(`ShapeScript path exceeds ${this.maxLoopIterations} commands`);
       switch (command.type) {
+        case "define":
+          this.handleDefine(command);
+          break;
+        case "detail":
+          this.handleDetail(command);
+          break;
         case "point": {
           const x = this.evaluateNumber(command.x);
           const y = this.evaluateNumber(command.y);
@@ -977,85 +994,15 @@ export class Converter {
 
     if (!pathNode) {
       // No path found, return empty group
-      console.warn("Lathe requires a path child");
-      return new THREE.Group();
+      throw new Error("Lathe requires a path child");
     }
 
-    // Extract points directly from path commands
-    const points: THREE.Vector2[] = [];
-    let currentX = 0;
-    let currentY = 0;
-    let currentAngle = 0;
-
-    const processCommand = (command: PathCommand) => {
-      switch (command.type) {
-        case "point":
-        case "curve": {
-          const x = this.evaluateNumber(command.x);
-          const y = this.evaluateNumber(command.y);
-
-          // Apply current rotation
-          const cos = Math.cos(currentAngle);
-          const sin = Math.sin(currentAngle);
-          const rotatedX = x * cos - y * sin;
-          const rotatedY = x * sin + y * cos;
-
-          currentX += rotatedX;
-          currentY += rotatedY;
-
-          // For lathe, we approximate curves with line segments
-          // Add the endpoint (control points affect the curve shape but for simple lathe we just use endpoints)
-          points.push(new THREE.Vector2(currentX, currentY));
-          break;
-        }
-
-        case "rotate": {
-          const angle = this.evaluateNumber(command.angle);
-          currentAngle += angle * Math.PI * 2;
-          break;
-        }
-
-        case "translate": {
-          const x = this.evaluateNumber(command.x);
-          const y = this.evaluateNumber(command.y);
-          currentX += x;
-          currentY += y;
-          break;
-        }
-
-        case "for": {
-          // Expand for loop
-          this.symbols.pushScope();
-
-          const from = this.evaluateNumber(command.from);
-          const to = this.evaluateNumber(command.to);
-          const step = command.step ? this.evaluateNumber(command.step) : 1;
-
-          // Path commands never reach `convertNode`, so `maxNodes` cannot stop
-          // this one — the shared bounded iterator is the only ceiling here.
-          const iterations = this.rangeIterations(from, to, step);
-
-          for (const i of iterations) {
-            this.symbols.set(command.variable, i);
-            for (const bodyCmd of command.commands) {
-              processCommand(bodyCmd);
-            }
-          }
-
-          this.symbols.popScope();
-          break;
-        }
-      }
-    };
-
-    // Process all path commands
-    for (const command of pathNode.commands) {
-      processCommand(command);
-    }
+    const shape = this.buildPath(pathNode);
+    this.chargePathEstimate(shape, this.detailLevel, this.detailLevel + 1);
+    const points = shape.getPoints(this.detailLevel);
 
     if (points.length < 2) {
-      console.warn("Lathe path must have at least 2 points");
-      return new THREE.Group();
+      throw new Error("Lathe path must have at least 2 points");
     }
 
     // What `LatheGeometry` is about to allocate: one ring of `detail + 1`
@@ -1079,24 +1026,39 @@ export class Converter {
     return mesh;
   }
 
-  private convertGroupBuilder(node: LoftNode | HullNode): THREE.Object3D {
-    // Generic converter for builders that just group their children.
-    // Through `inScope` like every other group builder: a child that throws
-    // must not strand the meshes already added (nothing downstream ever sees
-    // this group) or leave the scope frames behind.
-    const group = new THREE.Group();
-    return this.inScope(group, () => {
-      this.addChildren(group, node.children);
-      this.applyExplicitTransforms(group, node.properties);
-      this.applyCurrentTransform(group);
-    });
+  private buildFromChildren(node: { children: SceneNode[]; properties: ShapeProperties }, build: (meshes: THREE.Mesh[]) => THREE.BufferGeometry): THREE.Mesh {
+    const temporary = new THREE.Group();
+    let geometry: THREE.BufferGeometry;
+    try {
+      this.inScope(temporary, () => {
+        this.currentTransform().matrix.identity();
+        this.addChildren(temporary, node.children);
+      });
+      temporary.updateMatrixWorld(true);
+      const meshes: THREE.Mesh[] = [];
+      temporary.traverse((object) => {
+        if ((object as THREE.Mesh).isMesh) meshes.push(object as THREE.Mesh);
+      });
+      geometry = build(meshes);
+    } finally {
+      disposeObject3D(temporary);
+    }
+    return this.finishMesh(geometry, node);
   }
 
   private convertLoft(node: LoftNode): THREE.Object3D {
-    // Loft creates a 3D shape by interpolating between multiple 2D cross-sections
-    // For now, implement as a simple group that renders all children
-    // A proper implementation would use spline interpolation between shapes
-    return this.convertGroupBuilder(node);
+    return this.buildFromChildren(node, (meshes) => {
+      const profiles = meshes.map(profileOf);
+      const vertices = profiles.length * Math.max(0, ...profiles.map((ring) => ring.length));
+      this.chargeEstimate(vertices);
+      return loftGeometry(profiles);
+    });
+  }
+
+  private planarShape(mesh: THREE.Mesh): THREE.Shape {
+    const ring = profileOf(mesh);
+    if (ring.some((p) => Math.abs(p.z) > 1e-5)) throw new Error("Fill/extrude profiles must lie in the XY plane");
+    return new THREE.Shape(ring.map((p) => new THREE.Vector2(p.x, p.y)));
   }
 
   private convertFill(node: FillNode): THREE.Object3D {
@@ -1105,9 +1067,12 @@ export class Converter {
     return this.inFrame(() => {
       const pathNode = node.children.find((child): child is PathNode => child.type === "path");
       if (!pathNode) {
-        // No path found, return empty group
-        console.warn("Fill requires a path child");
-        return new THREE.Group();
+        return this.buildFromChildren(node, (meshes) => {
+          const shapes = meshes.map((mesh) => this.planarShape(mesh));
+          if (!shapes.length) throw new Error("Fill requires a path or planar shape");
+          for (const shape of shapes) this.chargePathEstimate(shape, 1, 3);
+          return new THREE.ShapeGeometry(shapes, 1);
+        });
       }
 
       // Build the 2D shape, then a ShapeGeometry (flat 2D shape) from it
@@ -1124,10 +1089,23 @@ export class Converter {
   }
 
   private convertHull(node: HullNode): THREE.Object3D {
-    // Hull creates a convex hull around child shapes
-    // Proper implementation requires computing convex hull from point cloud
-    // For now, just render children as a group
-    return this.convertGroupBuilder(node);
+    return this.buildFromChildren(node, (meshes) => {
+      const points: THREE.Vector3[] = [];
+      for (const mesh of meshes) {
+        const position = mesh.geometry.getAttribute("position");
+        for (let i = 0; i < position.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld));
+      }
+      if (points.length < 4) throw new Error("Hull requires at least four non-coplanar points");
+      this.chargeEstimate(points.length * 6);
+      const geometry = new ConvexGeometry(points);
+      if (!geometry.getAttribute("position").count) {
+        geometry.dispose();
+        throw new Error("Hull points must enclose a volume");
+      }
+      // CSG consumes UVs even on an untextured hull.
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(new Float32Array(geometry.getAttribute("position").count * 2), 2));
+      return geometry;
+    });
   }
 
   // Helper methods
@@ -1135,7 +1113,9 @@ export class Converter {
   private evaluateNumber(value: number | Expression | undefined): number {
     if (value === undefined) return 0;
     if (typeof value === "number") return value;
-    return this.evaluator.evaluateToNumber(value);
+    const result = this.evaluator.evaluateToNumber(value);
+    if (!Number.isFinite(result)) throw new Error("Expected a finite number");
+    return result;
   }
 
   private evaluateVector3(value: Vector3 | Expression | undefined): Vector3 {
@@ -1143,7 +1123,9 @@ export class Converter {
     if (Array.isArray(value) && typeof value[0] === "number") {
       return value as Vector3;
     }
-    return this.evaluator.evaluateToVector3(value as Expression);
+    const result = this.evaluator.evaluateToVector3(value as Expression);
+    if (!result.every(Number.isFinite)) throw new Error("Expected finite vector components");
+    return result;
   }
 
   private evaluateTranslateVector(value: Expression): Vector3 {

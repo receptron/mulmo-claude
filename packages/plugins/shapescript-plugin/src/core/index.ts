@@ -1,4 +1,12 @@
-export type { PresentShapeScriptData, PresentShapeScriptArgs, PresentShapeScriptResult, PresentShapeScriptRenderedResult } from "./types";
+export type {
+  PresentShapeScriptData,
+  PresentShapeScriptArgs,
+  PresentShapeScriptResult,
+  PresentShapeScriptRenderedResult,
+  PresentShapeScriptErrorResult,
+  PresentShapeScriptExecutionResult,
+  ShapeScriptDiagnostic,
+} from "./types";
 export { TOOL_NAME, TOOL_DEFINITION } from "./definition";
 export { pluginCore, presentShapeScript, executePresentShapeScript } from "./plugin";
 export { samples } from "./samples";

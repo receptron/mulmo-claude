@@ -63,4 +63,29 @@ test.describe("shapescript plugin rendering", () => {
     await expect(page.locator('[data-testid="shapescript-viewport"]')).toBeVisible();
     await expect(page.locator('[data-testid="shapescript-parse-error"]')).toHaveCount(0);
   });
+
+  test("validates edited geometry and renders completed builders", async ({ page }) => {
+    await page.goto("/chat/shapescript-session");
+    await page.getByText("Cube Row").first().click();
+    const view = page.getByTestId("shapescript-view");
+    await view.locator("summary").click();
+    const editor = view.locator("textarea");
+    const apply = view.locator("button.apply-btn");
+    await editor.fill("cube { size missing }");
+    await apply.click();
+    await expect(page.getByTestId("shapescript-parse-error")).toContainText("Undefined variable: missing");
+    // Failed edits remain unsaved and can be corrected in place.
+    await expect(apply).toBeEnabled();
+    for (const script of [
+      "loft { square translate 0 0 2 circle }",
+      "hull { cube cube { position 2 0 0 } }",
+      "stencil { cube { color 1 0 0 } cube { position 0.5 0 0 color 0 1 0 } }",
+    ]) {
+      await editor.fill(script);
+      await apply.click();
+      await expect(page.getByTestId("shapescript-parse-error")).toHaveCount(0);
+      await expect(apply).toBeDisabled();
+      await expect(view.locator("canvas")).toBeVisible();
+    }
+  });
 });

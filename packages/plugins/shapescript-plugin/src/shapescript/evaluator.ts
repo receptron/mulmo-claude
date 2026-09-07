@@ -7,6 +7,7 @@ export class SymbolTable {
 
   constructor() {
     this.pushScope();
+    for (const [name, value] of Object.entries({ pi: Math.PI, tau: 2 * Math.PI, true: true, false: false })) this.set(name, value);
   }
 
   pushScope(): void {
@@ -54,6 +55,7 @@ function vectorLength(v: Value): number {
 }
 
 // Built-in functions
+const memberIndices: Record<string, number> = { x: 0, y: 1, z: 2, w: 3, r: 0, g: 1, b: 2, a: 3, red: 0, green: 1, blue: 2, alpha: 3 };
 const builtInFunctions: Record<string, (...args: Value[]) => Value> = {
   // Arithmetic
   round: (x: Value) => Math.round(toNumber(x)),
@@ -63,8 +65,8 @@ const builtInFunctions: Record<string, (...args: Value[]) => Value> = {
   sign: (x: Value) => Math.sign(toNumber(x)),
   sqrt: (x: Value) => Math.sqrt(toNumber(x)),
   pow: (x: Value, y: Value) => Math.pow(toNumber(x), toNumber(y)),
-  min: (...args: Value[]) => Math.min(...args.map(toNumber)),
-  max: (...args: Value[]) => Math.max(...args.map(toNumber)),
+  min: (...args: Value[]) => Math.min(...args.flat().map(toNumber)),
+  max: (...args: Value[]) => Math.max(...args.flat().map(toNumber)),
 
   // Trigonometric (uses radians)
   sin: (x: Value) => Math.sin(toNumber(x)),
@@ -118,7 +120,7 @@ const builtInFunctions: Record<string, (...args: Value[]) => Value> = {
   // String functions
   join: (...args: Value[]) => {
     const separator = args.length > 0 && typeof args[args.length - 1] === "string" ? (args.pop() as string) : "";
-    return args.map(String).join(separator);
+    return args.flat().map(String).join(separator);
   },
 
   trim: (s: Value) => String(s).trim(),
@@ -182,6 +184,7 @@ export class Evaluator {
 
     // Handle expression nodes
     switch (expr.type) {
+      case "string":
       case "number":
         return expr.value;
 
@@ -200,6 +203,8 @@ export class Evaluator {
 
       case "binary": {
         const left = this.evaluate(expr.left);
+        if (expr.operator === "and" && !toBoolean(left)) return false;
+        if (expr.operator === "or" && toBoolean(left)) return true;
         const right = this.evaluate(expr.right);
 
         switch (expr.operator) {
@@ -311,6 +316,8 @@ export class Evaluator {
         const operand = this.evaluate(expr.operand);
 
         switch (expr.operator) {
+          case "+":
+            return Array.isArray(operand) ? operand.map(toNumber) : toNumber(operand);
           case "-":
             if (Array.isArray(operand)) {
               return operand.map((v) => -toNumber(v));
@@ -345,9 +352,21 @@ export class Evaluator {
         return expr.elements.map((el) => this.evaluate(el));
       }
 
-      case "member":
-      case "subscript":
-        throw new Error(`Member access and subscripting not yet implemented: ${expr.type}`);
+      case "member": {
+        const value = this.evaluate(expr.object);
+        if (expr.member === "count" && (Array.isArray(value) || typeof value === "string")) return value.length;
+        const index = memberIndices[expr.member];
+        if (Object.hasOwn(memberIndices, expr.member) && index !== undefined && Array.isArray(value) && index < value.length) return value[index]!;
+        throw new Error(`Unknown member: ${expr.member}`);
+      }
+      case "subscript": {
+        const value = this.evaluate(expr.object);
+        const index = this.evaluate(expr.index);
+        if (!Array.isArray(value) && typeof value !== "string") throw new Error("Subscripting requires a tuple or string");
+        if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= value.length)
+          throw new Error(`Subscript out of range: ${String(index)}`);
+        return value[index]!;
+      }
 
       default:
         throw new Error(`Unknown expression type: ${(expr as { type: string }).type}`);

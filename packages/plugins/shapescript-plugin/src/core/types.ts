@@ -23,3 +23,18 @@ export type PresentShapeScriptResult = ToolResult<PresentShapeScriptData>;
 export type PresentShapeScriptRenderedResult = PresentShapeScriptResult & {
   data: PresentShapeScriptData;
 };
+
+export interface ShapeScriptDiagnostic {
+  code: "INVALID_ARGUMENT" | "PARSE_ERROR" | "EVALUATION_ERROR" | "LIMIT_EXCEEDED";
+  message: string;
+  line?: number;
+  column?: number;
+}
+
+/** Errors carry no renderable data; jsonData is returned to the calling agent. */
+export type PresentShapeScriptErrorResult = ToolResult<never, { error: ShapeScriptDiagnostic }> & {
+  data?: never;
+  error: ShapeScriptDiagnostic;
+};
+
+export type PresentShapeScriptExecutionResult = PresentShapeScriptRenderedResult | PresentShapeScriptErrorResult;

@@ -4,11 +4,16 @@ export type Vector3 = [number, number, number];
 export type Color = [number, number, number];
 
 // Expression types
-export type Expression = NumberLiteral | IdentifierExpr | BinaryExpr | UnaryExpr | FunctionCall | MemberAccess | SubscriptExpr | TupleExpr;
+export type Expression = NumberLiteral | StringLiteral | IdentifierExpr | BinaryExpr | UnaryExpr | FunctionCall | MemberAccess | SubscriptExpr | TupleExpr;
 
 export interface NumberLiteral {
   type: "number";
   value: number;
+}
+
+export interface StringLiteral {
+  type: "string";
+  value: string;
 }
 
 export interface IdentifierExpr {
@@ -91,6 +96,7 @@ export interface ShapeProperties {
   size?: Vector3 | Expression;
   color?: Color | Expression;
   opacity?: number | Expression;
+  sides?: number | Expression;
   // For cylinder/cone specific properties
   radiusTop?: number | Expression;
   radiusBottom?: number | Expression;
@@ -245,7 +251,7 @@ export interface PathNode {
   commands: PathCommand[];
 }
 
-export type PathCommand = PointCommand | CurveCommand | RotateCommand | TranslateCommand | DetailPathCommand | ForLoopPathCommand;
+export type PathCommand = DefineNode | PointCommand | CurveCommand | RotateCommand | TranslateCommand | DetailPathCommand | ForLoopPathCommand;
 
 export interface PointCommand {
   type: "point";

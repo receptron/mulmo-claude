@@ -51,6 +51,86 @@ for i in 1 to count {
 
 A function call takes **no space** before its parenthesis: `sin(x)` is a call, `sin (x)` is not.
 
+## Validation and errors
+
+`executePresentShapeScript` checks arguments, parses the source, evaluates expressions,
+and builds geometry headlessly before returning success. Temporary geometry is disposed.
+Failures are returned as values, with **no `data` field**, so the host does not open a
+broken visualization. The same diagnostic is available as `error` and `jsonData.error`
+(the latter is included in the calling agent's tool response):
+
+```ts
+const result = await executePresentShapeScript(context, {
+  title: "Example", script: "cube { size missing }",
+});
+if ("error" in result) {
+  console.log(result.error.code, result.error.message);
+  // EVALUATION_ERROR, "Undefined variable: missing"
+}
+```
+
+Codes: `INVALID_ARGUMENT`, `PARSE_ERROR`, `EVALUATION_ERROR`, `LIMIT_EXCEEDED`.
+Parse diagnostics include `line` and `column` when available. Invalid input does not
+throw from the tool handler. Successful results retain their existing `{ title, data: { script } }`
+contract. Validation executes the script, including geometry construction; the browser
+constructs it again for display. The source editor also validates geometry before saving.
+
+## Builders and additional expressions
+
+```text
+// Loft joins sections and caps the ends; hull forms a convex envelope.
+loft {
+    square
+    translate 0 0 2
+    circle
+}
+hull {
+    cube { position -1 0 0 }
+    cube { position 1 0 0 }
+}
+extrude { polygon { sides 5 } }
+fill { square }
+lathe path { point 1 0 curve 0 2 1 -1 }
+
+// Stencil changes surface material without cutting away the first shape.
+stencil {
+    cube { color 1 0 0 }
+    cube { position 0.5 0 0 color 0 1 0 }
+}
+
+define offsets ((1 2 3), (4 5 6))
+cube { position offsets[0].x offsets[1].y offsets.count }
+```
+
+Also supported: `pi`, `tau`, `true`, `false`, scientific notation, unary `+`,
+short-circuit `and`/`or`, string literals, `join`/`trim`, tuple arguments to `min`/`max`,
+zero-based tuple/string subscripts, `.count`, vector `.x/.y/.z/.w`, color
+`.red/.green/.blue/.alpha` (or `.r/.g/.b/.a`), custom shape definitions with options,
+and `polygon { sides N }` (integer 3–256). Lathe samples curved profiles, and inline
+builder paths use the same parser as nested paths, including loops and definitions.
+
+## Compatibility and limits
+
+This is the plugin's documented modeling subset, **not complete compatibility with
+[upstream ShapeScript](https://shapescript.info/mac/)**. It preserves existing plugin
+conventions: primitive sphere/circle sizes specify radii; rotation/orientation properties
+and trig functions use radians; relative rotate/orientation commands and path rotation
+use turns (`1 = 360°`). Path point/curve coordinates are relative steps, and curve
+control coordinates are offsets from the endpoint. Upstream uses different conventions.
+
+Loft accepts ordered, closed planar sections with one perimeter each, resamples differing
+vertex counts, interpolates linearly, and triangulates the end caps. Sections must enclose
+a volume. Hull accepts geometry from child meshes and filled paths. Primitive profiles
+for fill/extrude must lie in XY; holes, swept/twisted extrusion, and arbitrary 3D path
+commands are not implemented. Imports, textures, text/fonts, lights/camera declarations,
+arbitrary objects, and general user-defined functions remain outside this subset.
+Unsupported commands and failed CSG operations return errors instead of silently
+substituting different geometry. As with other polygonal CSG engines, degenerate or
+self-intersecting inputs may fail.
+
+Conversion limits cover nodes, loop/path work, detail, and aggregate vertices (including
+CSG intermediates). These bound model complexity; they are not a wall-clock timeout.
+
 ## Scripts
 
 ```bash
