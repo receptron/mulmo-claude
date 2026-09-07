@@ -1,0 +1,181 @@
+// Coverage for the artifacts persistence added in 1.1.0: the `script` XOR
+// `path` tool contract, the `artifacts/shapes/**` path rules, and the View's
+// load / save dispatch. Everything goes through the generic gui-chat-protocol
+// `FileOps` capability, so an in-memory double is a complete host here.
+
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import type { FileOps } from "gui-chat-protocol";
+
+import { executePresentShapeScript } from "../src/core/plugin";
+import { executeShapeScriptDispatch } from "../src/core/dispatch";
+import { isShapeScriptDispatchArgs } from "../src/core/contract";
+import { isPresentableShapePath, isShapeArtifactPath, shapeArtifactPath, toArtifactsRelative } from "../src/core/paths";
+
+/** In-memory FileOps. Only the four methods the plugin calls are real; the rest
+ *  throw, so a future call site that needs them fails loudly in a test rather
+ *  than silently reading `undefined`. */
+function memoryFiles(seed: Record<string, string> = {}): FileOps & { store: Map<string, string> } {
+  const store = new Map(Object.entries(seed));
+  const missing = (name: string) => (): never => {
+    throw new Error(`FileOps.${name} is not part of this double`);
+  };
+  return {
+    store,
+    read: async (rel: string) => {
+      const value = store.get(rel);
+      if (value === undefined) throw new Error(`ENOENT: ${rel}`);
+      return value;
+    },
+    write: async (rel: string, content: string | Uint8Array) => {
+      store.set(rel, typeof content === "string" ? content : new TextDecoder().decode(content));
+    },
+    exists: async (rel: string) => store.has(rel),
+    unlink: async (rel: string) => void store.delete(rel),
+    readBytes: missing("readBytes"),
+    readDir: missing("readDir"),
+    stat: missing("stat"),
+  } as FileOps & { store: Map<string, string> };
+}
+
+const CUBE = "cube { size 1 }";
+
+describe("shape artifact paths", () => {
+  it("mints a flat, slugged, collision-suffixed path under artifacts/shapes", () => {
+    const { relPath, filePath } = shapeArtifactPath("A Desk Lamp", new Date(1718765432101));
+    assert.equal(relPath, "shapes/a-desk-lamp-1718765432101.shape");
+    assert.equal(filePath, "artifacts/shapes/a-desk-lamp-1718765432101.shape");
+    // Flat, not YYYY/MM-partitioned — one directory the user can browse.
+    assert.equal(relPath.split("/").length, 2);
+  });
+
+  it("falls back to a usable slug when the title contributes nothing", () => {
+    const { relPath } = shapeArtifactPath("🙂", new Date(1718765432101));
+    assert.equal(relPath, "shapes/shape-1718765432101.shape");
+  });
+
+  // The guard is the primary defence before a FileOps write: `path.join` does
+  // not normalise traversal, so anything it lets through reaches disk.
+  it("refuses traversal, the wrong extension, and paths outside the artifacts dir", () => {
+    assert.equal(isShapeArtifactPath("artifacts/shapes/lamp.shape"), true);
+    assert.equal(isShapeArtifactPath("artifacts/shapes/../../secrets.shape"), false);
+    assert.equal(isShapeArtifactPath("artifacts/shapes/lamp.md"), false);
+    assert.equal(isShapeArtifactPath("artifacts/documents/lamp.shape"), false);
+    assert.equal(isShapeArtifactPath("shapes/lamp.shape"), false);
+  });
+
+  it("strips only the artifacts root when converting to a FileOps path", () => {
+    assert.equal(toArtifactsRelative("artifacts/shapes/lamp.shape"), "shapes/lamp.shape");
+    assert.equal(toArtifactsRelative("models/lamp.shape"), "models/lamp.shape");
+  });
+
+  it("accepts any .shape for the `path` argument, artifact or not", () => {
+    assert.equal(isPresentableShapePath("models/lamp.shape"), true);
+    assert.equal(isPresentableShapePath("models/lamp.txt"), false);
+    assert.equal(isPresentableShapePath("models/../lamp.shape"), false);
+  });
+});
+
+describe("presentShapeScript persistence", () => {
+  it("saves a new script and names the file it wrote", async () => {
+    const artifacts = memoryFiles();
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Cube", script: CUBE });
+    assert.ok(result.data);
+    const filePath = result.data.filePath;
+    assert.ok(filePath?.startsWith("artifacts/shapes/"), `unexpected path: ${filePath}`);
+    assert.equal(artifacts.store.get(toArtifactsRelative(filePath!)), CUBE);
+    // The source travels in the result too, so the View renders without a round trip.
+    assert.equal(result.data.script, CUBE);
+  });
+
+  // A host with no file layer (the pre-1.1 contract, and MulmoTerminal until it
+  // ports) must keep working rather than failing on a missing capability.
+  it("still returns a renderable result when the host has no file layer", async () => {
+    const result = await executePresentShapeScript({}, { title: "Cube", script: CUBE });
+    assert.ok(result.data);
+    assert.equal(result.data.script, CUBE);
+    assert.equal(result.data.filePath, undefined);
+  });
+
+  it("presents an existing file in place without rewriting it", async () => {
+    const artifacts = memoryFiles({ "shapes/lamp.shape": CUBE });
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Lamp", path: "artifacts/shapes/lamp.shape" });
+    assert.ok(result.data);
+    assert.equal(result.data.script, CUBE);
+    assert.equal(result.data.filePath, "artifacts/shapes/lamp.shape");
+    // Nothing new was minted — presenting is not saving.
+    assert.equal(artifacts.store.size, 1);
+  });
+
+  it("reads a non-artifact path through the host's byPath capability", async () => {
+    const artifacts = memoryFiles();
+    const byPath = memoryFiles({ "models/lamp.shape": CUBE });
+    const result = await executePresentShapeScript({ files: { artifacts, byPath } }, { title: "Lamp", path: "models/lamp.shape" });
+    assert.ok(result.data);
+    assert.equal(result.data.script, CUBE);
+  });
+
+  it("refuses a path the host cannot reach instead of inventing an empty model", async () => {
+    const artifacts = memoryFiles();
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Lamp", path: "models/lamp.shape" });
+    assert.equal(result.data, undefined);
+    assert.equal(result.error?.code, "INVALID_ARGUMENT");
+  });
+
+  it("reports a missing file rather than a parse error", async () => {
+    const artifacts = memoryFiles();
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Lamp", path: "artifacts/shapes/gone.shape" });
+    assert.equal(result.data, undefined);
+    assert.match(result.error?.message ?? "", /No ShapeScript exists at/);
+  });
+
+  // JSON Schema cannot say "exactly one of these", so the executor is the only
+  // thing standing between an ambiguous call and one argument silently winning.
+  it("rejects script and path together", async () => {
+    const artifacts = memoryFiles({ "shapes/lamp.shape": CUBE });
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Lamp", script: CUBE, path: "artifacts/shapes/lamp.shape" });
+    assert.equal(result.data, undefined);
+    assert.match(result.error?.message ?? "", /not both/);
+  });
+
+  it("does not save a script that fails to build", async () => {
+    const artifacts = memoryFiles();
+    const result = await executePresentShapeScript({ files: { artifacts } }, { title: "Broken", script: "cube { size missing }" });
+    assert.equal(result.data, undefined);
+    assert.equal(result.error?.code, "EVALUATION_ERROR");
+    // The whole point of validating first: no half-written artifact is left behind.
+    assert.equal(artifacts.store.size, 0);
+  });
+});
+
+describe("shapescript dispatch", () => {
+  it("round-trips the source the View edits", async () => {
+    const artifacts = memoryFiles({ "shapes/lamp.shape": CUBE });
+    const context = { files: { artifacts } };
+    const loaded = await executeShapeScriptDispatch(context, { kind: "loadShape", path: "artifacts/shapes/lamp.shape" });
+    assert.deepEqual(loaded, { script: CUBE });
+
+    const next = "sphere { size 2 }";
+    const saved = await executeShapeScriptDispatch(context, { kind: "saveShape", path: "artifacts/shapes/lamp.shape", script: next });
+    assert.deepEqual(saved, { path: "artifacts/shapes/lamp.shape" });
+    assert.equal(artifacts.store.get("shapes/lamp.shape"), next);
+  });
+
+  it("refuses a traversal path before touching FileOps", async () => {
+    const artifacts = memoryFiles();
+    await assert.rejects(
+      () => executeShapeScriptDispatch({ files: { artifacts } }, { kind: "saveShape", path: "artifacts/shapes/../x.shape", script: CUBE }),
+      /must be an existing .shape file/,
+    );
+    assert.equal(artifacts.store.size, 0);
+  });
+
+  // Without the `script` check, `undefined` reaches `write` and blanks the file.
+  it("rejects a save payload with no script", () => {
+    assert.equal(isShapeScriptDispatchArgs({ kind: "saveShape", path: "artifacts/shapes/a.shape" }), false);
+    assert.equal(isShapeScriptDispatchArgs({ kind: "saveShape", path: "artifacts/shapes/a.shape", script: "" }), true);
+    assert.equal(isShapeScriptDispatchArgs({ kind: "loadShape", path: "artifacts/shapes/a.shape" }), true);
+    assert.equal(isShapeScriptDispatchArgs({ kind: "nope", path: "a.shape" }), false);
+    assert.equal(isShapeScriptDispatchArgs(null), false);
+  });
+});

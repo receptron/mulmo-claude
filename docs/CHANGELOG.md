@@ -10,6 +10,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Added
 
+#### `@mulmoclaude/shapescript-plugin@1.1.0` — ShapeScript models are files, and `renderShapeScript` lets the agent see them
+
+A ShapeScript model is now stored like a document instead of living only inside a chat
+message. A new `script` is saved to `artifacts/shapes/<slug>-<epoch-ms>.shape` and the tool
+result names it as `data.filePath`; `presentShapeScript` also accepts `path` instead of
+`script`, presenting a `.shape` that already exists — one it wrote earlier, or any other on
+disk — in place rather than copying it. The two arguments are mutually exclusive. The View's
+source editor writes edits back to that file and re-reads it when opened, so a model the agent
+rewrote is what the user sees, not a stale copy frozen into the conversation.
+
+Storage goes through the generic gui-chat-protocol `files.artifacts` / `files.byPath`
+capabilities and the plugin's own `loadShape` / `saveShape` dispatch — the same shape
+`@mulmoclaude/html-plugin` uses — so MulmoTerminal gets it by wiring the dispatch handler,
+with no ShapeScript-specific host method. A host that supplies no file capability keeps the
+previous behaviour rather than failing: the script travels in the result and nothing is
+written.
+
+New MCP tool **`renderShapeScript`** rasterises a model to a PNG under `artifacts/images/`
+and returns the path, so the agent can LOOK at what it built before showing it to the user —
+the same "saved image to \<path\>" contract `generateImage` uses. By default it renders four
+camera angles onto one labelled contact sheet, because a single projection is ambiguous about
+depth and occlusion: asked to judge one image, a model reliably gets "which of these is in
+front" wrong. `azimuth` / `elevation` aim the camera, `zoom` multiplies the automatic
+bounding-sphere framing (so one value means the same thing at any model scale), and
+`projection` switches to orthographic for judging proportions.
+
+Rendering drives Playwright's headless Chromium, which is a development dependency: an
+npm-installed host has no browser, and the tool then returns the install command instead of an
+image. `presentShapeScript` is unaffected — it never needed one. The recovery is documented in
+`error-recovery.md`, so the agent reads it rather than retrying.
+
 #### `@mulmoclaude/shapescript-plugin@1.0.1` — `presentShapeScript`: 3D visualizations from ShapeScript
 
 The 3D tool is now an in-tree package instead of the npm-installed
@@ -35,7 +66,7 @@ diagnostic (`PARSE_ERROR` / `EVALUATION_ERROR` / `LIMIT_EXCEEDED`, with the line
 where it can be known) instead of opening an empty viewport. `rnd` / `rand()` draw from a
 seeded generator so the server's validation and the browser's render cannot disagree.
 
-Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.7.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.0.1`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 

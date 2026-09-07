@@ -1296,3 +1296,34 @@ Deleting a shared collection is refused outright: the delete can neither archive
 nor remove documents that other members also read, and removing its records
 first does not unlock it. Retiring the whole app is a Firestore project
 administrator's recursive delete, not something this app does.
+
+## `renderShapeScript` says Playwright's Chromium is not installed
+
+`renderShapeScript` rasterises a ShapeScript model by driving a headless
+Chromium, and that browser is a DEVELOPMENT dependency — it ships with the
+MulmoClaude checkout, not with an npm install. When it is absent the tool
+returns, instead of an image path:
+
+```
+renderShapeScript needs Playwright's Chromium, which is not installed.
+Run `yarn ensure:playwright-browsers` in the MulmoClaude checkout
+(or `npx playwright install chromium`), then retry.
+```
+
+What to do:
+
+1. Tell the user the one command above, and that it is a one-time
+   ~150 MB browser download.
+2. Do NOT retry the call — nothing about the model changed, so the
+   second attempt fails identically.
+3. Carry on with `presentShapeScript`, which needs no browser: it
+   validates the geometry headlessly and shows the model to the user
+   in the chat canvas. The only thing you lose is your own ability to
+   LOOK at the render before presenting it, so be more conservative
+   about complex geometry and describe what you built rather than
+   claiming you verified its appearance.
+
+The same message with `(launch failed: …)` appended means the browser is
+installed but would not start — usually a sandbox with no permission to
+spawn it. Report the parenthesised reason to the user rather than the
+install hint alone.

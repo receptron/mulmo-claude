@@ -8,4 +8,10 @@ export const META = definePluginMeta({
     create: { method: "POST", path: "" },
   },
   mcpDispatch: "create",
+  workspaceDirs: {
+    /** Saved ShapeScript sources (`artifacts/shapes/<slug>-<ms>.shape`). Flat
+     *  rather than `YYYY/MM`-partitioned: a model is opened by name, and one
+     *  directory keeps that browsable. */
+    shapes: "artifacts/shapes",
+  },
 });

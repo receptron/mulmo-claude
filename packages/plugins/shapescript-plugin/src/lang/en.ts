@@ -9,6 +9,7 @@ const en: Messages = {
   editSource: "Edit ShapeScript Source",
   scriptEditorLabel: "ShapeScript source",
   applyChanges: "Apply Changes",
+  saveError: "Save Failed:",
 };
 
 export default en;

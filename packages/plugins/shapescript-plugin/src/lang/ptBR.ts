@@ -9,6 +9,7 @@ const ptBR: Messages = {
   editSource: "Editar o código ShapeScript",
   scriptEditorLabel: "Código ShapeScript",
   applyChanges: "Aplicar alterações",
+  saveError: "Falha ao salvar:",
 };
 
 export default ptBR;

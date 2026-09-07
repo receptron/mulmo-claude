@@ -12,7 +12,7 @@ name, and the `Present3D*` type names, are renamed throughout.
 
 | Entry         | Contents                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `.`           | `TOOL_NAME`, `TOOL_DEFINITION`, `executePresentShapeScript`, `pluginCore`, `samples`, `parseShapeScript`, `astToThreeJS` |
+| `.`           | `TOOL_NAME`, `TOOL_DEFINITION`, `executePresentShapeScript`, `pluginCore`, `samples`, `parseShapeScript`, `astToThreeJS`, `executeShapeScriptDispatch` + the `artifacts/shapes` path rules |
 | `./vue`       | the `ToolPlugin` (View + Preview + `SYSTEM_PROMPT`), plus everything on `.`                                              |
 | `./style.css` | the compiled component styles (Vite lib mode does not auto-inject them)                                                  |
 
@@ -50,6 +50,21 @@ for i in 1 to count {
   (radians), `dot cross length normalize sum`
 
 A function call takes **no space** before its parenthesis: `sin(x)` is a call, `sin (x)` is not.
+
+## Storage
+
+A new `script` is saved to `artifacts/shapes/<slug>-<epoch-ms>.shape` and the
+result names it as `data.filePath`; pass `path` instead of `script` to present a
+source that already exists — a `.shape` this tool wrote, or any other on disk —
+and it is rendered in place rather than copied. The two are mutually exclusive.
+The View's source editor writes edits back to that same file (dispatch kinds
+`loadShape` / `saveShape`), and refreshes from disk on open, so a model the agent
+rewrote is what the user sees.
+
+All file access goes through the host's generic gui-chat-protocol capability:
+`files.artifacts` for `artifacts/shapes/**`, `files.byPath` for anything else.
+A host that supplies neither keeps the pre-1.1 behaviour — the script travels
+inside the tool result and nothing is written — rather than failing.
 
 ## Validation and errors
 

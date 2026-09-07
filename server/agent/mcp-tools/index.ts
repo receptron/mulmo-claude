@@ -4,6 +4,7 @@ import { notify } from "./notify.js";
 import { handlePermission } from "./handlePermission.js";
 import { spawnBackgroundChat } from "./spawnBackgroundChat.js";
 import { manageCollection } from "./manageCollection.js";
+import { renderShapeScript } from "./renderShapeScript.js";
 import { errorMessage } from "../../utils/errors.js";
 import { notFound, sendError, serverError } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -36,7 +37,7 @@ export interface McpTool {
   handler: (args: Record<string, unknown>, ctx?: McpToolContext) => Promise<string>;
 }
 
-export const mcpTools: McpTool[] = [readXPost, searchX, notify, handlePermission, spawnBackgroundChat, manageCollection];
+export const mcpTools: McpTool[] = [readXPost, searchX, notify, handlePermission, spawnBackgroundChat, manageCollection, renderShapeScript];
 
 const toolMap = new Map(mcpTools.map((tool) => [tool.definition.name, tool]));
 

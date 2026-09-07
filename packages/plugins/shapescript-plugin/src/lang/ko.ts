@@ -9,6 +9,7 @@ const ko: Messages = {
   editSource: "ShapeScript 소스 편집",
   scriptEditorLabel: "ShapeScript 소스",
   applyChanges: "변경사항 적용",
+  saveError: "저장 실패:",
 };
 
 export default ko;

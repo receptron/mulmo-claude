@@ -22,6 +22,10 @@
       <strong>{{ t.parseError }}</strong> {{ parseError }}
     </div>
 
+    <div v-if="saveError" class="error" data-testid="shapescript-save-error">
+      <strong>{{ t.saveError }}</strong> {{ saveError }}
+    </div>
+
     <div ref="viewport" class="viewport" data-testid="shapescript-viewport" />
 
     <details class="script-source">
@@ -41,8 +45,10 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { useRuntime } from "gui-chat-protocol/vue";
 import type { ToolResult } from "gui-chat-protocol";
 import type { PresentShapeScriptData } from "../core/types";
+import { readLoadShapeResult, readSaveShapeResult } from "../core/contract";
 import { parseShapeScript } from "../shapescript/parser";
 import { astToThreeJS } from "../shapescript/toThreeJS";
 import { removeAndDispose, disposeObject3D } from "../shapescript/dispose";
@@ -74,11 +80,14 @@ const emit = defineEmits<{
 
 const t = useT();
 
+const { dispatch } = useRuntime();
+
 const editableScript = ref(props.selectedResult.data?.script ?? "");
 
 // State
 const viewport = ref<HTMLDivElement | null>(null);
 const parseError = ref<string | null>(null);
+const saveError = ref<string | null>(null);
 const showWireframe = ref(false);
 const showGrid = ref(true);
 
@@ -106,7 +115,29 @@ onMounted(() => {
   nextTick(() => {
     restoreCameraState();
   });
+  void refreshFromDisk();
 });
+
+/** Re-read a file-backed source, so an edit made outside this view — by the
+ *  agent, or in an editor — is what gets rendered rather than the copy frozen
+ *  into the tool result when it was created. Only the drift case emits: an
+ *  unchanged file must not rewrite conversation state on every open.
+ *
+ *  A failure is deliberately silent. The result already carries a renderable
+ *  script, so the view works; raising a banner for a file the user did not
+ *  just ask to save would report a problem they cannot act on. */
+async function refreshFromDisk(): Promise<void> {
+  const filePath = props.selectedResult.data?.filePath;
+  if (!filePath) return;
+  try {
+    const { script } = await dispatch({ kind: "loadShape", path: filePath }, readLoadShapeResult);
+    if (script === props.selectedResult.data?.script) return;
+    editableScript.value = script;
+    emit("updateResult", { ...props.selectedResult, data: { script, filePath } });
+  } catch {
+    // Keep the script the result carries.
+  }
+}
 
 onUnmounted(() => {
   cleanup();
@@ -339,26 +370,39 @@ function handleScriptEdit() {
   // User needs to click "Apply Changes" button
 }
 
-function applyScript() {
+async function applyScript() {
+  const script = editableScript.value;
   try {
     // Run the same semantic/geometry validation as the tool before saving.
-    disposeObject3D(astToThreeJS(parseShapeScript(editableScript.value)));
-
-    // If parsing succeeds, update the result (preserve existing viewState)
-    const updatedResult: ToolResult<PresentShapeScriptData> = {
-      ...props.selectedResult,
-      data: {
-        script: editableScript.value,
-      },
-    };
-
-    emit("updateResult", updatedResult);
-
-    // The loadShapeScript will be called automatically via the watch
+    disposeObject3D(astToThreeJS(parseShapeScript(script)));
   } catch (error) {
     parseError.value = error instanceof Error ? error.message : "Invalid ShapeScript";
     console.error("Script validation failed:", error);
+    return;
   }
+  parseError.value = null;
+
+  // Persist BEFORE updating the result: the file is the source of truth for a
+  // file-backed model, so a result that advanced past a failed write would
+  // render a script the next `loadShape` cannot find. A host with no file
+  // layer leaves `filePath` unset and the result stays the only copy.
+  const filePath = props.selectedResult.data?.filePath;
+  if (filePath) {
+    try {
+      await dispatch({ kind: "saveShape", path: filePath, script }, readSaveShapeResult);
+    } catch (error) {
+      saveError.value = error instanceof Error ? error.message : String(error);
+      return;
+    }
+  }
+  saveError.value = null;
+
+  // Update the result (preserve existing viewState); the watch re-renders.
+  const updatedResult: ToolResult<PresentShapeScriptData> = {
+    ...props.selectedResult,
+    data: filePath ? { script, filePath } : { script },
+  };
+  emit("updateResult", updatedResult);
 }
 
 // Watch for external changes to selectedResult (when user clicks different result)
