@@ -97,7 +97,7 @@ difference {
 - loft: loft { square translate 0 0 2 circle } (closed planar sections joined with caps)
 - hull: hull { cube { position -1 0 0 } cube { position 1 0 0 } } (convex envelope)
 - stencil preserves the first shape and paints its surface with later shapes' materials.
-Loft sections must each have one perimeter and enclose a volume; extrude/fill primitive profiles must lie in XY.
+Loft sections must each have one perimeter and enclose an area; extrude/fill primitive profiles must lie in XY.
 
 ### Additional Expressions:
 - Constants: pi, tau, true, false

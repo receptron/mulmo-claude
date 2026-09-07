@@ -1084,6 +1084,22 @@ export class Converter {
     return mesh;
   }
 
+  /** Build `children` into a throwaway group at the block's own origin and hand
+   *  back every mesh in it, world matrices already resolved. The group stays
+   *  owned by the caller, which disposes it. */
+  private buildOperands(temporary: THREE.Group, children: SceneNode[]): THREE.Mesh[] {
+    this.inScope(temporary, () => {
+      this.currentTransform().matrix.identity();
+      this.addChildren(temporary, children);
+    });
+    temporary.updateMatrixWorld(true);
+    const meshes: THREE.Mesh[] = [];
+    temporary.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh) meshes.push(object as THREE.Mesh);
+    });
+    return meshes;
+  }
+
   private buildFromChildren(node: { children: SceneNode[]; properties: ShapeProperties }, build: (meshes: THREE.Mesh[]) => THREE.BufferGeometry): THREE.Mesh {
     const temporary = new THREE.Group();
     // The operand meshes are charged as they are built — the budget has to hold
@@ -1094,16 +1110,7 @@ export class Converter {
     const chargedBeforeOperands = this.vertexCount;
     let geometry: THREE.BufferGeometry;
     try {
-      this.inScope(temporary, () => {
-        this.currentTransform().matrix.identity();
-        this.addChildren(temporary, node.children);
-      });
-      temporary.updateMatrixWorld(true);
-      const meshes: THREE.Mesh[] = [];
-      temporary.traverse((object) => {
-        if ((object as THREE.Mesh).isMesh) meshes.push(object as THREE.Mesh);
-      });
-      geometry = build(meshes);
+      geometry = build(this.buildOperands(temporary, node.children));
     } finally {
       disposeObject3D(temporary);
       this.vertexCount = chargedBeforeOperands;

@@ -617,44 +617,12 @@ export class Parser {
    *  so its elements are read as a VALUE LIST: `(1 +2 +3)` is three components,
    *  the same as `1 +2 +3` written without the parens. */
   private parseParenthesized(): Expression {
-    const elements: Expression[] = [];
-    elements.push(this.parseExpression());
+    const elements: Expression[] = [this.parseExpression()];
 
-    // Check if it's a comma-separated tuple
     if (this.current().type === TokenType.COMMA) {
-      while (this.current().type === TokenType.COMMA) {
-        this.advance();
-        if (this.current().type === TokenType.RPAREN) break;
-        elements.push(this.parseExpression());
-      }
-    }
-    // Check if it's a space-separated tuple (e.g., "(1 2 3)")
-    else {
-      const nextToken = this.current();
-      const canBeVectorComponent =
-        nextToken.type === TokenType.NUMBER ||
-        nextToken.type === TokenType.IDENTIFIER ||
-        nextToken.type === TokenType.MINUS ||
-        nextToken.type === TokenType.PLUS ||
-        nextToken.type === TokenType.LPAREN;
-
-      if (canBeVectorComponent && nextToken.type !== TokenType.RPAREN) {
-        // Parse space-separated values
-        while (true) {
-          const currentToken = this.current();
-          if (
-            currentToken.type === TokenType.NUMBER ||
-            currentToken.type === TokenType.IDENTIFIER ||
-            currentToken.type === TokenType.MINUS ||
-            currentToken.type === TokenType.PLUS ||
-            currentToken.type === TokenType.LPAREN
-          ) {
-            elements.push(this.parseExpression());
-          } else {
-            break;
-          }
-        }
-      }
+      this.parseCommaSeparated(elements);
+    } else {
+      this.parseSpaceSeparated(elements);
     }
 
     this.expect(TokenType.RPAREN);
@@ -663,6 +631,22 @@ export class Parser {
       return elements[0]; // Single parenthesized expression
     }
     return { type: "tuple", elements }; // Tuple
+  }
+
+  /** `(1, 2, 3)` — a trailing comma before the `)` ends the list. */
+  private parseCommaSeparated(elements: Expression[]): void {
+    while (this.current().type === TokenType.COMMA) {
+      this.advance();
+      if (this.current().type === TokenType.RPAREN) break;
+      elements.push(this.parseExpression());
+    }
+  }
+
+  /** `(1 2 3)` — components held apart by nothing but whitespace. */
+  private parseSpaceSeparated(elements: Expression[]): void {
+    while (this.startsValue()) {
+      elements.push(this.parseExpression());
+    }
   }
 
   private parseAtom(): Expression {
@@ -820,61 +804,17 @@ export class Parser {
     return this.withValueList(true, () => this.parseValueList());
   }
 
+  /** One property value: `1 -2 3` is a vector, `max(1 2)` a single expression,
+   *  and `wheel { … }` a custom shape invocation that belongs to no list. */
   private parseValueList(): Expression {
     const first = this.parseExpression();
+    if (!this.startsComponent()) return first;
 
-    // Check if there are more expressions following (space-separated values)
-    // Look ahead to see if next token could be part of a vector
-    const nextToken = this.current();
-
-    // Don't consume identifiers followed by LBRACE - they're custom shape invocations
-    const isCustomShapeInvocation = nextToken.type === TokenType.IDENTIFIER && this.peek().type === TokenType.LBRACE;
-
-    const canBeVectorComponent =
-      (nextToken.type === TokenType.NUMBER ||
-        nextToken.type === TokenType.IDENTIFIER ||
-        nextToken.type === TokenType.MINUS ||
-        nextToken.type === TokenType.PLUS ||
-        nextToken.type === TokenType.LPAREN) &&
-      !isCustomShapeInvocation;
-
-    if (canBeVectorComponent && nextToken.type !== TokenType.COMMA) {
-      // Parse space-separated values: x y z (or any number of values)
-      const elements: Expression[] = [first];
-
-      // Keep parsing as long as we see valid tuple component tokens
-      while (true) {
-        const currentToken = this.current();
-
-        // Check again for custom shape invocation
-        const isCustomShape = currentToken.type === TokenType.IDENTIFIER && this.peek().type === TokenType.LBRACE;
-
-        if (
-          (currentToken.type === TokenType.NUMBER ||
-            currentToken.type === TokenType.IDENTIFIER ||
-            currentToken.type === TokenType.MINUS ||
-            currentToken.type === TokenType.PLUS ||
-            currentToken.type === TokenType.LPAREN) &&
-          !isCustomShape
-        ) {
-          elements.push(this.parseExpression());
-        } else {
-          break;
-        }
-      }
-
-      if (elements.length > 1) {
-        return { type: "tuple", elements };
-      }
+    const elements: Expression[] = [first];
+    while (this.startsComponent()) {
+      elements.push(this.parseExpression());
     }
-
-    // If it's already a tuple, return it
-    if (first.type === "tuple") {
-      return first;
-    }
-
-    // Single expression
-    return first;
+    return elements.length > 1 ? { type: "tuple", elements } : first;
   }
 
   private parseProperties(): ShapeProperties {
@@ -1325,11 +1265,18 @@ export class Parser {
     }
   }
 
-  /** Whether the current token can begin another value of a path command, so
-   *  `point +1 +0` and `point -1 0` both read as two values. */
-  private startsPathValue(): boolean {
+  /** Whether the current token can begin another value of a whitespace-separated
+   *  list, so `point +1 +0`, `position 1 -2 3` and `(1 2 3)` each read as
+   *  several values rather than one arithmetic expression. */
+  private startsValue(): boolean {
     const type = this.current().type;
     return type === TokenType.NUMBER || type === TokenType.MINUS || type === TokenType.PLUS || type === TokenType.IDENTIFIER || type === TokenType.LPAREN;
+  }
+
+  /** As `startsValue`, but `name {` is a custom shape invocation rather than the
+   *  next component of the list being read. */
+  private startsComponent(): boolean {
+    return this.startsValue() && !(this.current().type === TokenType.IDENTIFIER && this.peek().type === TokenType.LBRACE);
   }
 
   private isStartOfNewValue(): boolean {
@@ -1372,7 +1319,7 @@ export class Parser {
           const x = this.parsePathValue();
           // Y is optional - defaults to 0 if not provided
           let y: Expression = { type: "number", value: 0 };
-          if (this.startsPathValue()) {
+          if (this.startsValue()) {
             y = this.parsePathValue();
           }
           commands.push({ type: "point", x, y });
@@ -1388,11 +1335,11 @@ export class Parser {
           let controlY: Expression | undefined;
 
           // Check if there's a potential third value (control point x)
-          if (this.startsPathValue()) {
+          if (this.startsValue()) {
             controlX = this.parsePathValue();
 
             // Try to parse fourth value (control point y)
-            if (this.startsPathValue()) {
+            if (this.startsValue()) {
               controlY = this.parsePathValue();
             }
           }
@@ -1453,7 +1400,7 @@ export class Parser {
                 const x = this.parsePathValue();
                 // Y is optional - defaults to 0 if not provided
                 let y: Expression = { type: "number", value: 0 };
-                if (this.startsPathValue()) {
+                if (this.startsValue()) {
                   y = this.parsePathValue();
                 }
                 bodyCommands.push({ type: "point", x, y });
@@ -1468,11 +1415,11 @@ export class Parser {
                 let controlY: Expression | undefined;
 
                 // Check if there's a potential third value (control point x)
-                if (this.startsPathValue()) {
+                if (this.startsValue()) {
                   controlX = this.parsePathValue();
 
                   // Try to parse fourth value (control point y)
-                  if (this.startsPathValue()) {
+                  if (this.startsValue()) {
                     controlY = this.parsePathValue();
                   }
                 }
