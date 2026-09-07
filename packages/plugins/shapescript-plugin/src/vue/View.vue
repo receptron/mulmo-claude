@@ -45,7 +45,7 @@ import type { ToolResult } from "gui-chat-protocol";
 import type { PresentShapeScriptData } from "../core/types";
 import { parseShapeScript } from "../shapescript/parser";
 import { astToThreeJS } from "../shapescript/toThreeJS";
-import { removeAndDispose } from "../shapescript/dispose";
+import { removeAndDispose, disposeObject3D } from "../shapescript/dispose";
 import { useT } from "../lang";
 
 interface CameraState {
@@ -341,8 +341,8 @@ function handleScriptEdit() {
 
 function applyScript() {
   try {
-    // Try to parse the script first to validate it
-    parseShapeScript(editableScript.value);
+    // Run the same semantic/geometry validation as the tool before saving.
+    disposeObject3D(astToThreeJS(parseShapeScript(editableScript.value)));
 
     // If parsing succeeds, update the result (preserve existing viewState)
     const updatedResult: ToolResult<PresentShapeScriptData> = {

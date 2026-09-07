@@ -27,7 +27,7 @@ describe("presentShapeScript tool", () => {
     const script = "cube { size 1 }";
     const result = await executePresentShapeScript(context, { title: "Cube", script });
     assert.equal(result.title, "Cube");
-    assert.notEqual(result.data, undefined);
+    assert.ok(result.data);
     assert.equal(result.data.script, script);
   });
 
@@ -35,13 +35,15 @@ describe("presentShapeScript tool", () => {
     const scripts = ["cube { size 1 }", "difference {\n  sphere { size 2 }\n  sphere { size 1.7 }\n}", "for i in 1 to 4 {\n  cube { position (i * 2) 0 0 }\n}"];
     for (const script of scripts) {
       const result = await executePresentShapeScript(context, { title: "T", script });
-      assert.notEqual(result.data, undefined, `no data for: ${script}`);
+      assert.ok(result.data, `no data for: ${script}`);
       assert.equal(result.data.script, script);
     }
   });
 
   it("rejects an empty script", async () => {
-    await assert.rejects(() => executePresentShapeScript(context, { title: "Empty", script: "   " }), /ShapeScript code is required/);
+    const result = await executePresentShapeScript(context, { title: "Empty", script: "   " });
+    assert.equal(result.data, undefined);
+    assert.match(result.message ?? "", /ShapeScript code is required/);
   });
 });
 
@@ -234,8 +236,8 @@ describe("ShapeScript robustness", () => {
   });
 
   it("frees a refused loft/hull group and leaves no scope frame behind", () => {
-    // `loft` and `hull` render their children as a plain group, which is
-    // abandoned like any other when a later child trips the budget.
+    // Builder operands are collected in a temporary group, which must be
+    // disposed when a later child trips the budget.
     const disposed: string[] = [];
     const original = THREE.BufferGeometry.prototype.dispose;
     THREE.BufferGeometry.prototype.dispose = function patched(this: THREE.BufferGeometry) {

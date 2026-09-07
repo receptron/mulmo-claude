@@ -3,7 +3,7 @@ export const TOOL_NAME = "presentShapeScript";
 export const TOOL_DEFINITION = {
   type: "function" as const,
   name: TOOL_NAME,
-  description: "Display interactive 3D visualizations using the full ShapeScript language with expressions, variables, control flow, and functions.",
+  description: "Display interactive 3D visualizations using ShapeScript with expressions, variables, control flow, and functions.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
       },
       script: {
         type: "string",
-        description: `ShapeScript code defining the 3D scene. Full language features supported.
+        description: `ShapeScript code defining the 3D scene. Supported features and syntax are listed below. Syntax, evaluation, geometry and resource-limit errors are returned as diagnostics; correct the script and retry.
 
 ## SYNTAX OVERVIEW:
 
@@ -77,7 +77,7 @@ for i in 1 to 8 {
 
 ### Primitives & Properties:
 
-Shapes: cube, sphere, cylinder, cone, torus
+Shapes: cube, sphere, cylinder, cone, torus, circle, square, polygon (sides 3–256)
 Properties: position X Y Z, rotation X Y Z, size X Y Z
 Materials: color R G B (0-1), opacity (0-1)
 
@@ -89,6 +89,32 @@ difference {
     sphere { size 2 color (1 0.5 0) }
     cube { size 1.5 }
 }
+
+### Builders:
+- extrude: extrude { polygon { sides 3 } } or extrude path { point 0 0 point 1 0 point 0 1 }
+- fill: fill { square } or fill path { ... }
+- lathe: lathe path { point 1 0 curve 0 2 1 -1 } (revolves about Y)
+- loft: loft { square translate 0 0 2 circle } (closed planar sections joined with caps)
+- hull: hull { cube { position -1 0 0 } cube { position 1 0 0 } } (convex envelope)
+- stencil preserves the first shape and paints its surface with later shapes' materials.
+Loft sections must each have one perimeter and enclose an area; extrude/fill primitive profiles must lie in XY.
+
+### Additional Expressions:
+- Constants: pi, tau, true, false
+- Scientific notation and unary plus: 1e-3, +2
+- Tuple/vector members: vector.x, vector.y, vector.z; color.red/green/blue/alpha
+- Tuple/string length: value.count; zero-based indexing: values[0]
+- String literals, join(...), trim(...); min/max also accept tuples
+- Custom shapes with options:
+define post { option height 2 cylinder { size 0.2 height } }
+post { height 3 }
+
+### Compatibility:
+This plugin implements the documented modeling subset, not all upstream ShapeScript syntax.
+Function calls use name(...); trig functions and rotation/orientation properties use radians.
+Relative rotate/orientation commands and path rotate use turns (1 = 360 degrees).
+Path point/curve coordinates are relative steps. Curves accept optional control-point offsets.
+Imports, textures, text/fonts, arbitrary objects, and general user-defined functions are not supported.
 
 ### Comments:
 // Single-line comment

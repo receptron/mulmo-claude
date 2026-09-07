@@ -26,20 +26,20 @@ function emptyResources(): Resources {
 function materialsOf(mesh: Partial<THREE.Mesh>): THREE.Material[] {
   const { material } = mesh;
   if (Array.isArray(material)) return material;
-  return material instanceof THREE.Material ? [material] : [];
+  return material?.isMaterial ? [material] : [];
 }
 
 function collectInto(root: THREE.Object3D, into: Resources): Resources {
   root.traverse((object) => {
     const mesh = object as Partial<THREE.Mesh>;
-    if (mesh.geometry instanceof THREE.BufferGeometry) into.geometries.add(mesh.geometry);
+    if (mesh.geometry?.isBufferGeometry) into.geometries.add(mesh.geometry);
     for (const material of materialsOf(mesh)) {
       into.materials.add(material);
       // Textures are not walked by `Material.dispose()`, and the maps a
       // MeshStandardMaterial can carry are typed loosely — check each value
       // rather than naming every slot.
       for (const value of Object.values(material)) {
-        if (value instanceof THREE.Texture) into.textures.add(value);
+        if (value && (value as THREE.Texture).isTexture) into.textures.add(value as THREE.Texture);
       }
     }
   });

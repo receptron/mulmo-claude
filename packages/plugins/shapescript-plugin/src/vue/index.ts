@@ -17,7 +17,7 @@ export const SYSTEM_PROMPT = `Use the ${TOOL_NAME} tool to create interactive 3D
 - Game boards or 3D game states
 - Any spatial or geometric concepts
 
-## ShapeScript Language Features (FULL SUPPORT):
+## Supported ShapeScript Features:
 
 ### Variables & Expressions:
 - Define variables: define radius 2, define spacing 1.5
@@ -89,7 +89,15 @@ Shapes: cube, sphere, cylinder, cone, torus
 CSG: union, difference, intersection, xor, stencil
 Properties: position, rotation, size, color, opacity
 
-Keep visualizations clear, well-organized, and leverage the full power of expressions and control flow.`;
+Builders: extrude, fill, lathe, loft, hull. Example: loft { square translate 0 0 2 circle }.
+Stencil preserves the first shape's volume and paints the intersecting surface.
+Constants: pi, tau, true, false. Tuple/string access: values[0], vector.x, value.count.
+Polygon supports sides (3–256). String literals and join/trim are supported.
+Use the tool schema for exact syntax and builder limits. This is a modeling subset of upstream ShapeScript;
+imports, textures, text/fonts and general user-defined functions are not supported.
+If presentShapeScript returns an error diagnostic, correct the script and retry; no visualization was created.
+
+Keep visualizations clear, well-organized, and use expressions and control flow.`;
 
 export const plugin: ToolPlugin<PresentShapeScriptData, unknown, PresentShapeScriptArgs> = {
   ...pluginCore,
@@ -99,7 +107,15 @@ export const plugin: ToolPlugin<PresentShapeScriptData, unknown, PresentShapeScr
   systemPrompt: SYSTEM_PROMPT,
 };
 
-export type { PresentShapeScriptData, PresentShapeScriptArgs, PresentShapeScriptResult, PresentShapeScriptRenderedResult } from "../core/types";
+export type {
+  PresentShapeScriptData,
+  PresentShapeScriptArgs,
+  PresentShapeScriptResult,
+  PresentShapeScriptRenderedResult,
+  PresentShapeScriptErrorResult,
+  PresentShapeScriptExecutionResult,
+  ShapeScriptDiagnostic,
+} from "../core/types";
 
 export { TOOL_NAME, TOOL_DEFINITION } from "../core/definition";
 export { executePresentShapeScript, pluginCore } from "../core/plugin";
