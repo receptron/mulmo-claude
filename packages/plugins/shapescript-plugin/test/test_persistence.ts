@@ -11,6 +11,9 @@ import { executePresentShapeScript } from "../src/core/plugin";
 import { executeShapeScriptDispatch } from "../src/core/dispatch";
 import { isShapeScriptDispatchArgs } from "../src/core/contract";
 import { isPresentableShapePath, isShapeArtifactPath, shapeArtifactPath, toArtifactsRelative } from "../src/core/paths";
+import { astToThreeJS, DEFAULT_MAX_NODES, DEFAULT_MAX_VERTICES, DEFAULT_MAX_DURATION_MS } from "../src/shapescript/toThreeJS";
+import { parseShapeScript } from "../src/shapescript/parser";
+import { disposeObject3D } from "../src/shapescript/dispose";
 
 /** In-memory FileOps. Only the four methods the plugin calls are real; the rest
  *  throw, so a future call site that needs them fails loudly in a test rather
@@ -224,5 +227,33 @@ describe("shapescript dispatch", () => {
     assert.equal(isShapeScriptDispatchArgs({ kind: "loadShape", path: "artifacts/shapes/a.shape" }), true);
     assert.equal(isShapeScriptDispatchArgs({ kind: "nope", path: "a.shape" }), false);
     assert.equal(isShapeScriptDispatchArgs(null), false);
+  });
+});
+
+describe("conversion budgets", () => {
+  // The three ceilings have to agree about how big a model may be. They did
+  // not: measured, a grid-shaped model was refused for object count at ~540k
+  // vertices — a quarter of the vertex budget — so `maxNodes` decided the
+  // answer for one shape of model and `maxVertices` for another.
+  it("lets the vertex budget, not the object count, bound a grid-shaped model", () => {
+    // 150x150 cubes: 22,500 objects, ~540k vertices. Inside every ceiling now.
+    const group = astToThreeJS(parseShapeScript("for x in -75 to 74 {\n  for z in -75 to 74 {\n    cube { position x 0 z size 0.8 }\n  }\n}"));
+    let vertices = 0;
+    group.traverse((object) => {
+      const geometry = (object as { geometry?: { attributes?: { position?: { count: number } } } }).geometry;
+      vertices += geometry?.attributes?.position?.count ?? 0;
+    });
+    assert.ok(vertices > 500_000, `expected a heavy grid, got ${vertices} vertices`);
+    assert.ok(vertices < DEFAULT_MAX_VERTICES);
+    disposeObject3D(group);
+  });
+
+  // Pinned rather than asserted loosely: these are the numbers a script author
+  // and the tool's error messages both reason about, so a change to them should
+  // be a decision, not a side effect.
+  it("keeps the documented ceilings", () => {
+    assert.equal(DEFAULT_MAX_NODES, 100_000);
+    assert.equal(DEFAULT_MAX_VERTICES, 5_000_000);
+    assert.equal(DEFAULT_MAX_DURATION_MS, 30_000);
   });
 });

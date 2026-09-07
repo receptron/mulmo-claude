@@ -27,6 +27,13 @@ with no ShapeScript-specific host method. A host that supplies no file capabilit
 previous behaviour rather than failing: the script travels in the result and nothing is
 written.
 
+The conversion budgets are raised: **100,000 nodes** (from 20,000), **5,000,000 vertices** (from
+2,000,000) and a **30-second** wall clock (from 10). The old ceilings disagreed with each other
+about how big a model may be — measured, a 150×150 grid of cubes was refused for object count at
+~540k vertices, barely a quarter of the vertex budget — and the wall clock is in practice the CSG
+budget alone, where 10 s left almost no room (100 boolean subtractions take 5.3 s, while 240k
+vertices of plain geometry convert in ~95 ms).
+
 New MCP tool **`renderShapeScript`** rasterises a model to a PNG under `artifacts/images/`
 and returns the path, so the agent can LOOK at what it built before showing it to the user —
 the same "saved image to \<path\>" contract `generateImage` uses. By default it renders four

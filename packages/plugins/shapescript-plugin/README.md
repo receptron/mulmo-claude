@@ -148,9 +148,17 @@ self-intersecting inputs may fail.
 on the server, which validates it, and again in the browser, which renders it — and an
 unseeded generator lets those two runs take different branches.
 
-Conversion limits cover nodes, loop/path work, detail, aggregate vertices (including CSG
-intermediates), and a coarse wall-clock budget checked between nodes — it refuses to start
-the next node once the budget is spent, but cannot interrupt one long boolean.
+Conversion limits cover nodes (100,000), loop/path work (100,000 iterations), detail (3–256),
+aggregate vertices (5,000,000, including CSG intermediates), and a coarse 30-second wall-clock
+budget checked between nodes — it refuses to start the next node once the budget is spent, but
+cannot interrupt one long boolean. Every one is overridable through `ConversionOptions`.
+
+Measured, those ceilings bind in different places: a grid of 22,500 cubes is ~540k vertices and
+converts in under 200 ms, 930 spheres at `detail 64` reach the vertex budget, and the wall clock
+is in practice the CSG budget alone — 240k vertices of plain geometry take ~95 ms, while 100
+boolean subtractions take 5.3 s. Remember the script is built TWICE, once on the server to
+validate it and once in the browser to draw it, and that the browser's copy is what the user's
+tab has to keep rendering.
 
 ## Scripts
 
