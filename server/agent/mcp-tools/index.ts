@@ -4,6 +4,7 @@ import { notify } from "./notify.js";
 import { handlePermission } from "./handlePermission.js";
 import { spawnBackgroundChat } from "./spawnBackgroundChat.js";
 import { manageCollection } from "./manageCollection.js";
+import { renderShapeScript } from "./renderShapeScript.js";
 import { errorMessage } from "../../utils/errors.js";
 import { notFound, sendError, serverError } from "../../utils/httpError.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
@@ -33,10 +34,17 @@ export interface McpTool {
    *  the per-role gate for these. Use only for generic host
    *  infrastructure that benefits every role. */
   alwaysActive?: boolean;
+  /** Bridge timeout for THIS tool, when the shared `MCP_TOOL_BRIDGE_TIMEOUT_MS`
+   *  (sized for external-API calls) is shorter than the work it does. The
+   *  bridge must outlast the handler's own budget, or a slow-but-successful
+   *  call is aborted in transit and the user sees a timeout for a job that was
+   *  about to finish (codex on #3056: renderShapeScript's 60 s render under a
+   *  30 s bridge). */
+  bridgeTimeoutMs?: number;
   handler: (args: Record<string, unknown>, ctx?: McpToolContext) => Promise<string>;
 }
 
-export const mcpTools: McpTool[] = [readXPost, searchX, notify, handlePermission, spawnBackgroundChat, manageCollection];
+export const mcpTools: McpTool[] = [readXPost, searchX, notify, handlePermission, spawnBackgroundChat, manageCollection, renderShapeScript];
 
 const toolMap = new Map(mcpTools.map((tool) => [tool.definition.name, tool]));
 

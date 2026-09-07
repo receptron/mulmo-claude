@@ -1296,3 +1296,33 @@ Deleting a shared collection is refused outright: the delete can neither archive
 nor remove documents that other members also read, and removing its records
 first does not unlock it. Retiring the whole app is a Firestore project
 administrator's recursive delete, not something this app does.
+
+## `renderShapeScript` says Chromium is not installed
+
+`renderShapeScript` rasterises a ShapeScript model by driving Puppeteer's
+headless Chromium — the same browser the PDF export uses. Puppeteer downloads
+it at install time, so this normally just works; a host that set
+`PUPPETEER_SKIP_DOWNLOAD`, or a sandbox that cannot spawn a browser, has none.
+The tool then returns, instead of an image path:
+
+```
+renderShapeScript needs Puppeteer's headless Chromium, which this host does
+not have. Run `npx puppeteer browsers install chrome`, then retry.
+```
+
+What to do:
+
+1. Tell the user the one command above.
+2. Do NOT retry the call — nothing about the model changed, so the
+   second attempt fails identically.
+3. Carry on with `presentShapeScript`, which needs no browser: it
+   validates the geometry headlessly and shows the model to the user
+   in the chat canvas. The only thing you lose is your own ability to
+   LOOK at the render before presenting it, so be more conservative
+   about complex geometry and describe what you built rather than
+   claiming you verified its appearance.
+
+The same message with `(launch failed: …)` appended means the browser is
+installed but would not start — usually a sandbox with no permission to
+spawn it. Report the parenthesised reason to the user rather than the
+install hint alone.

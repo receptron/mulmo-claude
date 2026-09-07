@@ -12,7 +12,7 @@ name, and the `Present3D*` type names, are renamed throughout.
 
 | Entry         | Contents                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `.`           | `TOOL_NAME`, `TOOL_DEFINITION`, `executePresentShapeScript`, `pluginCore`, `samples`, `parseShapeScript`, `astToThreeJS` |
+| `.`           | `TOOL_NAME`, `TOOL_DEFINITION`, `executePresentShapeScript`, `pluginCore`, `samples`, `parseShapeScript`, `astToThreeJS`, `executeShapeScriptDispatch` + the `artifacts/shapes` path rules |
 | `./vue`       | the `ToolPlugin` (View + Preview + `SYSTEM_PROMPT`), plus everything on `.`                                              |
 | `./style.css` | the compiled component styles (Vite lib mode does not auto-inject them)                                                  |
 
@@ -50,6 +50,21 @@ for i in 1 to count {
   (radians), `dot cross length normalize sum`
 
 A function call takes **no space** before its parenthesis: `sin(x)` is a call, `sin (x)` is not.
+
+## Storage
+
+A new `script` is saved to `artifacts/shapes/<slug>-<epoch-ms>.shape` and the
+result names it as `data.filePath`; pass `path` instead of `script` to present a
+source that already exists — a `.shape` this tool wrote, or any other on disk —
+and it is rendered in place rather than copied. The two are mutually exclusive.
+The View's source editor writes edits back to that same file (dispatch kinds
+`loadShape` / `saveShape`), and refreshes from disk on open, so a model the agent
+rewrote is what the user sees.
+
+All file access goes through the host's generic gui-chat-protocol capability:
+`files.artifacts` for `artifacts/shapes/**`, `files.byPath` for anything else.
+A host that supplies neither keeps the pre-1.1 behaviour — the script travels
+inside the tool result and nothing is written — rather than failing.
 
 ## Validation and errors
 
@@ -133,9 +148,17 @@ self-intersecting inputs may fail.
 on the server, which validates it, and again in the browser, which renders it — and an
 unseeded generator lets those two runs take different branches.
 
-Conversion limits cover nodes, loop/path work, detail, aggregate vertices (including CSG
-intermediates), and a coarse wall-clock budget checked between nodes — it refuses to start
-the next node once the budget is spent, but cannot interrupt one long boolean.
+Conversion limits cover nodes (100,000), loop/path work (100,000 iterations), detail (3–256),
+aggregate vertices (5,000,000, including CSG intermediates), and a coarse 30-second wall-clock
+budget checked between nodes — it refuses to start the next node once the budget is spent, but
+cannot interrupt one long boolean. Every one is overridable through `ConversionOptions`.
+
+Measured, those ceilings bind in different places: a grid of 22,500 cubes is ~540k vertices and
+converts in under 200 ms, 930 spheres at `detail 64` reach the vertex budget, and the wall clock
+is in practice the CSG budget alone — 240k vertices of plain geometry take ~95 ms, while 100
+boolean subtractions take 5.3 s. Remember the script is built TWICE, once on the server to
+validate it and once in the browser to draw it, and that the browser's copy is what the user's
+tab has to keep rendering.
 
 ## Scripts
 

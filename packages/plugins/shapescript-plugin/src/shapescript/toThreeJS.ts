@@ -57,8 +57,13 @@ export interface ConversionOptions {
 // only an attack. Without a ceiling that call allocates until the tab dies, and
 // the user cannot even read the error because nothing yields. Both limits are
 // far above any legible model (the shipped samples peak in the dozens) and far
-// below what hurts: 20k meshes render, 100M do not.
-export const DEFAULT_MAX_NODES = 20_000;
+// below what hurts: 100k meshes render, 100M do not.
+//
+// Raised from 20k: measured, that ceiling was the FIRST one a grid-shaped model
+// hit, and it hit it early — a 150x150 array of cubes was refused at ~540k
+// vertices, barely a quarter of the vertex budget, so the two ceilings
+// disagreed about how big a model is allowed to be.
+export const DEFAULT_MAX_NODES = 100_000;
 export const DEFAULT_MAX_LOOP_ITERATIONS = 100_000;
 
 // `detail` is a smoothing hint that becomes a SEGMENT COUNT on every curved
@@ -75,8 +80,11 @@ export const MAX_DETAIL = 256;
 // at the maximum detail is ~10^9 vertices, and a position alone is 12 bytes
 // before normals and UVs — tens of gigabytes, allocated synchronously, from a
 // script that satisfies every other budget. This is the aggregate ceiling.
-// 2M vertices is a heavy scene that still renders; an order more does not.
-export const DEFAULT_MAX_VERTICES = 2_000_000;
+// 5M vertices is a heavy scene that still renders; an order more does not.
+// It is also the budget that decides how SMOOTH a model may be rather than how
+// large: at `detail 64` a sphere is ~2.1k vertices, so this is roughly 2,300 of
+// them.
+export const DEFAULT_MAX_VERTICES = 5_000_000;
 
 // The counting budgets bound what a script ALLOCATES, not how long it takes to
 // get there: CSG is superlinear in its operands, so a script well inside every
@@ -85,7 +93,13 @@ export const DEFAULT_MAX_VERTICES = 2_000_000;
 // between nodes, so it is coarse by construction: it cannot interrupt one long
 // boolean, only refuse to start the next. Generous enough that no legible model
 // reaches it (the shipped samples convert in milliseconds).
-export const DEFAULT_MAX_DURATION_MS = 10_000;
+//
+// In practice this is the CSG budget and nothing else: 240k vertices of plain
+// geometry converts in ~95 ms, while 100 boolean subtractions take 5.3 s. 10 s
+// left almost no room for the second kind, so it is 30 s — still a bounded wait
+// for the agent's tool call, and still short of the plugin bridge's own
+// timeout.
+export const DEFAULT_MAX_DURATION_MS = 30_000;
 
 // `ShapeGeometry`'s own default when no `curveSegments` is passed. Named here
 // because the pre-flight estimate has to predict what the constructor will do.

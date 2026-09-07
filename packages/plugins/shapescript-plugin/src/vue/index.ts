@@ -119,6 +119,8 @@ export type {
 
 export { TOOL_NAME, TOOL_DEFINITION } from "../core/definition";
 export { executePresentShapeScript, pluginCore } from "../core/plugin";
+export { isShapeScriptDispatchArgs, readLoadShapeResult, readSaveShapeResult } from "../core/contract";
+export type { ShapeScriptDispatchArgs } from "../core/contract";
 
 export { samples } from "../core/samples";
 

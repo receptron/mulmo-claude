@@ -54,6 +54,10 @@ import "./plugins/markdown-builtin.js";
 // Side-effect: registers the built-in "html" dispatch handler so the
 // presentHtml View's useRuntime().dispatch({ kind }) resolves (phase 2).
 import "./plugins/html-builtin.js";
+// Side-effect: registers the built-in "shapescript" dispatch handler so the
+// presentShapeScript View's useRuntime().dispatch({ kind }) resolves — the
+// source editor's load / save against artifacts/shapes/.
+import "./plugins/shapescript-builtin.js";
 import { loadRuntimePlugins } from "./plugins/runtime-loader.js";
 import { evaluateDevPluginGate, loadDevPlugins, parseDevPluginsEnv } from "./plugins/dev-loader.js";
 import { watchDevPlugins } from "./plugins/dev-watcher.js";

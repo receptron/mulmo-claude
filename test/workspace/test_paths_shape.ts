@@ -98,6 +98,7 @@ describe("WORKSPACE_DIRS expected keys", () => {
     "roles",
     "scheduler",
     "searches",
+    "shapes",
     "skillsCatalog",
     "skillsCatalogPreset",
     "skillsStaging",

@@ -14,7 +14,7 @@ import type { PresentCollectionArgs } from "../../../src/plugins/presentCollecti
 import { loadCollection, validateCollectionRecords } from "../../workspace/collections/index.js";
 import { defangForPrompt } from "@mulmoclaude/core/collection";
 import { executeOpenCanvas } from "../../../src/plugins/canvas/definition.js";
-import { executePresentShapeScript } from "@mulmoclaude/shapescript-plugin";
+import { executePresentShapeScript, SHAPE_EXTENSIONS } from "@mulmoclaude/shapescript-plugin";
 import { executeMapControl } from "@gui-chat-plugin/google-map";
 import { errorMessage } from "../../utils/errors.js";
 import { badRequest, serverError } from "../../utils/httpError.js";
@@ -22,6 +22,7 @@ import { saveImage } from "../../utils/files/image-store.js";
 import { fillMarkdownImagePlaceholders } from "../../utils/files/markdown-image-fill.js";
 import { saveMarkdown } from "../../utils/files/markdown-store.js";
 import { documentExists, overwriteDocument, resolveDocumentPath } from "../../utils/files/document-store.js";
+import { makeByPathFileOps } from "../../utils/files/by-path.js";
 import { saveSpreadsheet, overwriteSpreadsheet, isSpreadsheetPath } from "../../utils/files/spreadsheet-store.js";
 import { API_ROUTES } from "../../../src/config/apiRoutes.js";
 import { bindRoute } from "../../utils/router.js";
@@ -29,6 +30,7 @@ import { collectPluginMetaDiagnostics } from "../../plugins/diagnostics.js";
 import { log } from "../../system/logger/index.js";
 import { previewSnippet } from "../../utils/logPreview.js";
 import { publishFileChange } from "../../events/file-change.js";
+import { makeArtifactsFileOps } from "../../plugins/runtime.js";
 import { isAblated } from "../../system/env.js";
 
 const router = Router();
@@ -385,13 +387,23 @@ bindRoute(
   }),
 );
 
-// presentShapeScript — 3D visualization from ShapeScript source
+// presentShapeScript — 3D visualization from ShapeScript source.
+// `files` is the GENERIC gui-chat-protocol capability the package writes new
+// sources through (`artifacts/shapes/**`) and reads a `path` argument with;
+// `byPath` is what lets it open a source outside the artifacts root. All
+// ShapeScript logic — script/path mutual exclusion, slug/path building,
+// containment guard, geometry validation — lives in the package.
+const shapeScriptFiles = { artifacts: makeArtifactsFileOps(), byPath: makeByPathFileOps(SHAPE_EXTENSIONS) };
+
 bindRoute(
   router,
   API_ROUTES.shapescript.create,
-  wrapPluginExecute<Parameters<typeof executePresentShapeScript>[1]>((req) =>
-    executePresentShapeScript(sessionToolContext(req, TOOL_NAMES.presentShapeScript), req.body),
-  ),
+  wrapPluginExecute<Parameters<typeof executePresentShapeScript>[1]>(async (req) => {
+    const result = await executePresentShapeScript({ ...sessionToolContext(req, TOOL_NAMES.presentShapeScript), files: shapeScriptFiles }, req.body);
+    // Fire-and-forget: any subscribed View tab refetches via cache-bust.
+    if (result.data?.filePath) void publishFileChange(result.data.filePath);
+    return result;
+  }),
 );
 
 // mapControl — Google Map (showLocation / Places / Directions etc.)

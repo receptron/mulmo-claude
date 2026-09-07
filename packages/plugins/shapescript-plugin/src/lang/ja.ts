@@ -9,6 +9,7 @@ const ja: Messages = {
   editSource: "ShapeScript を編集",
   scriptEditorLabel: "ShapeScript ソース",
   applyChanges: "変更を適用",
+  saveError: "保存に失敗しました:",
 };
 
 export default ja;

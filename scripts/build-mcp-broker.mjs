@@ -28,6 +28,14 @@ const OUTFILE = "server/build/mcp-server.mjs";
 // the collection store; left external it resolves from node_modules as before.
 const NATIVE_EXTERNALS = ["@duckdb/*", "duckdb"];
 
+// Puppeteer drives the headless browser `renderShapeScript` rasterises with.
+// It stays external: it is reached through a lazy dynamic import, ships its own
+// browser download machinery, and inlining a browser driver into the broker
+// would be tens of megabytes to support one optional tool. Left external the
+// import resolves from node_modules where a browser exists and throws where it
+// does not — which the tool's "Chromium is not installed" path already handles.
+const BROWSER_EXTERNALS = ["puppeteer", "puppeteer-core"];
+
 // express / body-parser / debug are CJS and call `require()` at runtime, which
 // an ESM bundle has no binding for — without this the broker dies at load with
 // `Dynamic require of "tty" is not supported`.
@@ -43,7 +51,7 @@ export function brokerBuildOptions() {
     platform: "node",
     format: "esm",
     target: "node22",
-    external: NATIVE_EXTERNALS,
+    external: [...NATIVE_EXTERNALS, ...BROWSER_EXTERNALS],
     // Dependencies are INLINED, not left external. Tried external
     // (`packages: "external"`) to keep the bundle at 505 KB instead of 12 MB —
     // it dies in the container with `Cannot find package

@@ -7,4 +7,5 @@ export interface Messages {
   editSource: string;
   scriptEditorLabel: string;
   applyChanges: string;
+  saveError: string;
 }

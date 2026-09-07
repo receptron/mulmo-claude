@@ -61,6 +61,10 @@ const HOST_TOOL_NAMES = {
   readXPost: "readXPost",
   searchX: "searchX",
   notify: "notify",
+  // The ShapeScript renderer: a pure MCP tool (no View — it saves a PNG and
+  // returns its path), so it is listed here rather than in a plugin META.
+  // Grant it wherever `presentShapeScript` is granted.
+  renderShapeScript: "renderShapeScript",
   // Generic host primitives — always active for every role (not gated
   // by `availablePlugins`). See `McpTool.alwaysActive`.
   spawnBackgroundChat: "spawnBackgroundChat",

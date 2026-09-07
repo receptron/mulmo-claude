@@ -9,6 +9,7 @@ const zh: Messages = {
   editSource: "编辑 ShapeScript 源码",
   scriptEditorLabel: "ShapeScript 源码",
   applyChanges: "应用更改",
+  saveError: "保存失败：",
 };
 
 export default zh;

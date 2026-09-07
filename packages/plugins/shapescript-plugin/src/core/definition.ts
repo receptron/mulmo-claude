@@ -3,7 +3,8 @@ export const TOOL_NAME = "presentShapeScript";
 export const TOOL_DEFINITION = {
   type: "function" as const,
   name: TOOL_NAME,
-  description: "Display interactive 3D visualizations using ShapeScript with expressions, variables, control flow, and functions.",
+  description:
+    "Display interactive 3D visualizations using ShapeScript with expressions, variables, control flow, and functions. A new `script` is saved to `artifacts/shapes/` and the returned `filePath` names it; pass `path` instead to present a source that already exists.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -163,7 +164,12 @@ for x in -5 to 5 {
     }
 }`,
       },
+      path: {
+        type: "string",
+        description:
+          "Path to an EXISTING ShapeScript source to present in place, instead of `script` — a `.shape` file this tool saved earlier (`artifacts/shapes/…`) or any other on disk. Provide either `script` or `path`, never both. Edits the user makes in the view write back to that same file.",
+      },
     },
-    required: ["title", "script"],
+    required: ["title"],
   },
 };

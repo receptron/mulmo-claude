@@ -1,6 +1,6 @@
 {
   "name": "@mulmoclaude/shapescript-plugin",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "presentShapeScript — interactive 3D visualizations authored in the ShapeScript language (parser + Three.js renderer). Core (tool definition + execute) on `.`, Vue View/Preview on `./vue`.",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,11 +40,13 @@
     "three-mesh-bvh": "0.9.13"
   },
   "peerDependencies": {
+    "@mulmoclaude/core": "^4.8.0",
     "gui-chat-protocol": "^2.0.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@mulmoclaude/core": "^4.8.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.4.1",
     "@types/three": "^0.185.1",

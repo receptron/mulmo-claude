@@ -2,11 +2,23 @@ import type { ToolResult } from "gui-chat-protocol";
 
 export interface PresentShapeScriptData {
   script: string;
+  /** The `.shape` file this result renders, when it is backed by one. Set for
+   *  every result a host with the `files.artifacts` capability produces; absent
+   *  for a host that has no file layer, where `script` is the only copy. The
+   *  View saves edits back to THIS path — without it, "Apply Changes" only
+   *  updates the conversation's copy. */
+  filePath?: string | undefined;
 }
 
+/** Args the LLM passes when invoking the tool. Two shapes share this type: the
+ *  create path (`script`, saved to a fresh `artifacts/shapes/**` path) and the
+ *  present-existing path (`path`, rendered in place). Only `title` is
+ *  `required` in TOOL_DEFINITION.parameters because JSON Schema can't express
+ *  that either-or; the executor enforces the mutual exclusion. */
 export interface PresentShapeScriptArgs {
   title: string;
-  script: string;
+  script?: string;
+  path?: string;
 }
 
 export type PresentShapeScriptResult = ToolResult<PresentShapeScriptData>;

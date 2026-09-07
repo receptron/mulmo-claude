@@ -9,6 +9,7 @@ const de: Messages = {
   editSource: "ShapeScript-Quelltext bearbeiten",
   scriptEditorLabel: "ShapeScript-Quelltext",
   applyChanges: "Änderungen übernehmen",
+  saveError: "Speichern fehlgeschlagen:",
 };
 
 export default de;
