@@ -134,6 +134,18 @@ describe("geometry builders", () => {
   it("refuses a conversion that outruns the wall-clock budget", () => {
     assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript("detail 32 for i in 1 to 5000 { sphere }"), { maxDurationMs: 0 })), /longer than/);
   });
+  it("refuses a path whose accumulated coordinates overflow", () => {
+    // Individually finite operands, but the pen is relative: `NaN` positions
+    // reach the geometry and every later comparison against them is false.
+    for (const script of [
+      "lathe path { point 1e308 0 point 1e308 1 }",
+      "fill path { point 1e308 0 point 1e308 1e308 point 0 1e308 }",
+      "extrude path { for i in 1 to 10 { point 1e307 1e307 } }",
+      "lathe path { rotate 1e308 rotate 1e308 point 1 0 point 1 1 }",
+    ]) {
+      assert.throws(() => disposeObject3D(astToThreeJS(parseShapeScript(script))), /overflow/, script);
+    }
+  });
   it("refuses a degenerate inline path instead of presenting an empty mesh", () => {
     for (const script of [
       "fill path { point 0 0 }",

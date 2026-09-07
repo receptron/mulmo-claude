@@ -871,7 +871,11 @@ export class Converter {
    *  that only looks flat at low detail is not rejected. */
   private requireEnclosedArea(shape: THREE.Shape, command: string): THREE.Shape {
     const points = shape.getPoints(SHAPE_GEOMETRY_CURVE_SEGMENTS);
-    if (points.length < 3 || Math.abs(THREE.ShapeUtils.area(points)) < DEGENERATE_AREA) {
+    const area = THREE.ShapeUtils.area(points);
+    // `NaN` fails EVERY comparison, so a path whose coordinates overflowed to
+    // infinity while accumulating would sail past a bare `< DEGENERATE_AREA`.
+    if (!Number.isFinite(area)) throw new Error(`\`${command}\` needs finite path coordinates — these overflow`);
+    if (points.length < 3 || Math.abs(area) < DEGENERATE_AREA) {
       throw new Error(`\`${command}\` needs a path that encloses an area — this one has fewer than three distinct points, or they are collinear`);
     }
     return shape;
@@ -925,6 +929,19 @@ export class Converter {
     // `extrude` and `fill` rendered nothing at all. Track the pen explicitly.
     let penDown = false;
 
+    // Path coordinates ACCUMULATE — each command is relative to the last — so
+    // operands that are individually finite can still overflow the pen to
+    // infinity. `LatheGeometry` and friends then build with `NaN` positions,
+    // which no later check catches: a comparison against a `NaN` area is simply
+    // false, and validation would report success over invisible geometry.
+    const movePen = (dx: number, dy: number) => {
+      currentX += dx;
+      currentY += dy;
+      if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) {
+        throw new Error("Path coordinates overflowed to a non-finite value — they accumulate, so each command adds to the previous one");
+      }
+    };
+
     const processCommand = (command: PathCommand) => {
       if (++this.pathCommandCount > this.maxLoopIterations) throw new ShapeScriptLimitError(`ShapeScript path exceeds ${this.maxLoopIterations} commands`);
       switch (command.type) {
@@ -944,8 +961,7 @@ export class Converter {
           const rotatedX = x * cos - y * sin;
           const rotatedY = x * sin + y * cos;
 
-          currentX += rotatedX;
-          currentY += rotatedY;
+          movePen(rotatedX, rotatedY);
 
           if (penDown) {
             shape.lineTo(currentX, currentY);
@@ -966,8 +982,7 @@ export class Converter {
           const rotatedX = x * cos - y * sin;
           const rotatedY = x * sin + y * cos;
 
-          currentX += rotatedX;
-          currentY += rotatedY;
+          movePen(rotatedX, rotatedY);
 
           // A curve needs a starting point like any other segment.
           if (!penDown) {
@@ -991,14 +1006,12 @@ export class Converter {
           // In ShapeScript, 1 = 360 degrees = 2π radians
           const angle = this.evaluateNumber(command.angle);
           currentAngle += angle * Math.PI * 2;
+          if (!Number.isFinite(currentAngle)) throw new Error("Path rotation overflowed to a non-finite angle");
           break;
         }
 
         case "translate": {
-          const x = this.evaluateNumber(command.x);
-          const y = this.evaluateNumber(command.y);
-          currentX += x;
-          currentY += y;
+          movePen(this.evaluateNumber(command.x), this.evaluateNumber(command.y));
           break;
         }
 
