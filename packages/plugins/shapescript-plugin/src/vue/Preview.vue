@@ -82,8 +82,9 @@ function initPreview() {
     scene.add(directionalLight);
 
     // Parse and add ShapeScript objects
-    if (!props.result.data?.script) return;
-    const ast = parseShapeScript(props.result.data.script);
+    const initialScript = props.result.data?.script;
+    if (!initialScript) return;
+    const ast = parseShapeScript(initialScript);
     sceneGroup = astToThreeJS(ast, { wireframe: false });
     scene.add(sceneGroup);
 
@@ -107,7 +108,8 @@ function animate() {
 }
 
 function reloadScene() {
-  if (!scene || !props.result.data?.script) return;
+  if (!scene) return;
+  const script = props.result.data?.script;
 
   try {
     // Remove old objects — and free them. `scene.remove` only drops the
@@ -115,9 +117,13 @@ function reloadScene() {
     // disposed, and this runs again on every script change.
     removeAndDispose(scene, sceneGroup);
     sceneGroup = null;
+    // An empty script is valid and means "nothing to draw". Returning before
+    // the removal above left the PREVIOUS result's geometry on screen, so the
+    // thumbnail described a model the result no longer has.
+    if (!script) return;
 
     // Parse and create new objects
-    const ast = parseShapeScript(props.result.data.script);
+    const ast = parseShapeScript(script);
     sceneGroup = astToThreeJS(ast, { wireframe: false });
     scene.add(sceneGroup);
   } catch (error) {

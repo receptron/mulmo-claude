@@ -254,18 +254,30 @@ export class Converter {
    *  dispose it. The `finally` is the other half: a throw must not leave the
    *  scope frames behind for whatever runs next. */
   private inScope(group: THREE.Group, build: () => void): THREE.Group {
+    return this.inFrame(() => {
+      try {
+        build();
+      } catch (error) {
+        disposeObject3D(group);
+        throw error;
+      }
+      return group;
+    });
+  }
+
+  /** The frame half on its own, for builders that return a single mesh rather
+   *  than a group: there is nothing to dispose (a geometry that trips the
+   *  budget is freed by `makeMesh`), but a throw must still not leave the
+   *  symbol and transform frames behind for whatever runs next. */
+  private inFrame<T>(build: () => T): T {
     this.symbols.pushScope();
     this.pushTransform();
     try {
-      build();
-    } catch (error) {
-      disposeObject3D(group);
-      throw error;
+      return build();
     } finally {
       this.popTransform();
       this.symbols.popScope();
     }
-    return group;
   }
 
   private convertBlock(node: { children: SceneNode[] }): THREE.Group {
@@ -942,12 +954,14 @@ export class Converter {
   }
 
   private convertLathe(node: LatheNode): THREE.Object3D {
-    // Lathe rotates a 2D profile around an axis to create a 3D shape
-    // In ShapeScript, the path defines the profile
+    // The frames are pushed here so a throw anywhere in `buildLathe` — a budget
+    // refusal, a bad expression in the profile — cannot leave them behind.
+    return this.inFrame(() => this.buildLathe(node));
+  }
 
-    // Create new scope
-    this.symbols.pushScope();
-    this.pushTransform();
+  private buildLathe(node: LatheNode): THREE.Object3D {
+    // Lathe rotates a 2D profile around an axis to create a 3D shape.
+    // In ShapeScript, the path defines the profile.
 
     // Find path node in children
     let pathNode: PathNode | null = null;
@@ -961,8 +975,6 @@ export class Converter {
     if (!pathNode) {
       // No path found, return empty group
       console.warn("Lathe requires a path child");
-      this.popTransform();
-      this.symbols.popScope();
       return new THREE.Group();
     }
 
@@ -1040,8 +1052,6 @@ export class Converter {
 
     if (points.length < 2) {
       console.warn("Lathe path must have at least 2 points");
-      this.popTransform();
-      this.symbols.popScope();
       return new THREE.Group();
     }
 
@@ -1063,34 +1073,26 @@ export class Converter {
     this.applyExplicitTransforms(mesh, node.properties);
     this.applyCurrentTransform(mesh);
 
-    this.popTransform();
-    this.symbols.popScope();
-
     return mesh;
   }
 
   private convertGroupBuilder(node: LoftNode | HullNode): THREE.Object3D {
-    // Generic converter for builders that just group their children
-    this.symbols.pushScope();
-    this.pushTransform();
-
+    // Generic converter for builders that just group their children.
+    // Through `inScope` like every other group builder: a child that throws
+    // must not strand the meshes already added (nothing downstream ever sees
+    // this group) or leave the scope frames behind.
     const group = new THREE.Group();
-
-    // Convert all children
-    for (const child of node.children) {
-      const object = this.convertNode(child);
-      if (object) {
-        group.add(object);
+    return this.inScope(group, () => {
+      for (const child of node.children) {
+        const object = this.convertNode(child);
+        if (object) {
+          group.add(object);
+        }
       }
-    }
 
-    this.applyExplicitTransforms(group, node.properties);
-    this.applyCurrentTransform(group);
-
-    this.popTransform();
-    this.symbols.popScope();
-
-    return group;
+      this.applyExplicitTransforms(group, node.properties);
+      this.applyCurrentTransform(group);
+    });
   }
 
   private convertLoft(node: LoftNode): THREE.Object3D {
@@ -1103,44 +1105,23 @@ export class Converter {
   private convertFill(node: FillNode): THREE.Object3D {
     // Fill creates a solid 2D shape from a path
     // Similar to extrude but with zero depth
-
-    this.symbols.pushScope();
-    this.pushTransform();
-
-    // Find path node in children
-    let pathNode: PathNode | null = null;
-    for (const child of node.children) {
-      if (child.type === "path") {
-        pathNode = child as PathNode;
-        break;
+    return this.inFrame(() => {
+      const pathNode = node.children.find((child): child is PathNode => child.type === "path");
+      if (!pathNode) {
+        // No path found, return empty group
+        console.warn("Fill requires a path child");
+        return new THREE.Group();
       }
-    }
 
-    if (!pathNode) {
-      // No path found, return empty group
-      console.warn("Fill requires a path child");
-      this.popTransform();
-      this.symbols.popScope();
-      return new THREE.Group();
-    }
+      // Build the 2D shape, then a ShapeGeometry (flat 2D shape) from it
+      const geometry = new THREE.ShapeGeometry(this.buildPath(pathNode));
+      const mesh = this.makeMesh(geometry, this.createMaterial(node));
 
-    // Build the 2D shape
-    const shape = this.buildPath(pathNode);
+      this.applyExplicitTransforms(mesh, node.properties);
+      this.applyCurrentTransform(mesh);
 
-    // Create a ShapeGeometry (flat 2D shape)
-    const geometry = new THREE.ShapeGeometry(shape);
-
-    // Create material
-    const material = this.createMaterial(node);
-    const mesh = this.makeMesh(geometry, material);
-
-    this.applyExplicitTransforms(mesh, node.properties);
-    this.applyCurrentTransform(mesh);
-
-    this.popTransform();
-    this.symbols.popScope();
-
-    return mesh;
+      return mesh;
+    });
   }
 
   private convertHull(node: HullNode): THREE.Object3D {

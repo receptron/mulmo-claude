@@ -201,6 +201,25 @@ describe("ShapeScript robustness", () => {
     assert.equal(attributes, 0, "geometry buffers were allocated before the budget refused them");
   });
 
+  it("frees a refused loft/hull group and leaves no scope frame behind", () => {
+    // `loft` and `hull` render their children as a plain group, which is
+    // abandoned like any other when a later child trips the budget.
+    const disposed: string[] = [];
+    const original = THREE.BufferGeometry.prototype.dispose;
+    THREE.BufferGeometry.prototype.dispose = function patched(this: THREE.BufferGeometry) {
+      disposed.push(this.type);
+    };
+    try {
+      assert.throws(
+        () => astToThreeJS(parseShapeScript("hull {\n  cube { size 1 }\n  cube { size 1 }\n  cube { size 1 }\n}"), { maxNodes: 3 }),
+        ShapeScriptLimitError,
+      );
+    } finally {
+      THREE.BufferGeometry.prototype.dispose = original;
+    }
+    assert.ok(disposed.length > 0, "the refused hull freed nothing");
+  });
+
   it("frees the root group when the conversion fails at the top level", () => {
     // Not nested in a loop or a CSG block: the root itself is abandoned, and
     // both Vue surfaces catch the error to display it, so nothing downstream
