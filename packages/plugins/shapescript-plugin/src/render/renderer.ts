@@ -74,6 +74,18 @@ export interface RenderShapeScriptOptions {
  *  the script is at fault. */
 export class RenderUnavailableError extends Error {}
 
+/** Report a fault that did not fail the render, without letting the report
+ *  become one. The callback is the HOST's code: it runs inside the `finally`
+ *  that releases the browser, so a synchronous throw from it would reject that
+ *  block and replace a finished PNG with a logging error (CodeRabbit on #3059). */
+function warn(options: RenderShapeScriptOptions, message: string): void {
+  try {
+    options.onWarning?.(message);
+  } catch {
+    // A logger that throws is the host's problem, not this render's.
+  }
+}
+
 // This module is built twice — ESM and, for hosts running CJS, CommonJS — and the
 // two disagree about how a file locates itself. `import.meta` is rewritten to an
 // empty object in the CJS output, so resolving three from `import.meta.url` alone
@@ -135,6 +147,28 @@ interface BrowserLike {
   close: () => Promise<void>;
 }
 
+/** A `require` anchored at THIS PACKAGE's real install location, however the
+ *  calling code got here.
+ *
+ *  `moduleUrl()` is not enough on its own: MulmoClaude's MCP broker bundles its
+ *  whole import graph into one file, so by the time this runs the module's own
+ *  URL is the broker's, and resolving `three` from there searches the HOST's
+ *  node_modules. That happened to work while the host declared three; it does
+ *  not in a nested layout (a version conflict under npx, pnpm, Yarn PnP), where
+ *  three exists only under this package — and this change removed the host
+ *  declaration that was hiding it (codex on #3059).
+ *
+ *  Resolving our own `package.json` first re-anchors the search at wherever the
+ *  package actually lives. Falling back to the module's own URL keeps a host
+ *  that somehow cannot see the package name working exactly as before. */
+function packageRequire(): ReturnType<typeof createRequire> {
+  try {
+    return createRequire(require.resolve("@mulmoclaude/shapescript-plugin/package.json"));
+  } catch {
+    return require;
+  }
+}
+
 /** Absolute path of three's ES module build.
  *
  *  three's `exports` map publishes `.` under an `import` / `require` split and
@@ -142,7 +176,7 @@ interface BrowserLike {
  *  the bare specifier under CJS rules yields the CommonJS build — which a
  *  `<script type="module">` cannot run — hence the swap to its ESM sibling. */
 function threeModulePath(): string {
-  const resolved = require.resolve("three");
+  const resolved = packageRequire().resolve("three");
   return resolved.endsWith("three.cjs") ? resolved.replace(/three\.cjs$/, "three.module.js") : resolved;
 }
 
@@ -251,6 +285,6 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
     // that just succeeded, so it must not replace the result with an error. The
     // host has the logger; this package reports it through `onWarning` when one
     // was supplied.
-    await browser.close().catch((err: unknown) => options.onWarning?.(`chromium close failed: ${errorMessage(err)}`));
+    await browser.close().catch((err: unknown) => warn(options, `chromium close failed: ${errorMessage(err)}`));
   }
 }

@@ -25,7 +25,8 @@
       "require": "./dist/vue.cjs",
       "default": "./dist/vue.js"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/style.css",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
