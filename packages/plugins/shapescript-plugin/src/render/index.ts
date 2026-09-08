@@ -12,3 +12,15 @@ export { renderShapeScriptSheet, RenderUnavailableError, CHROMIUM_HINT, RENDER_T
 export type { RenderShapeScriptOptions } from "./renderer";
 export { buildRenderPage, gridFor } from "./page";
 export type { ViewAngle, RenderPageOptions } from "./page";
+export {
+  executeRenderShapeScript,
+  viewAngles,
+  RENDER_SHAPE_SCRIPT_TOOL_NAME,
+  RENDER_SHAPE_SCRIPT_DESCRIPTION,
+  RENDER_SHAPE_SCRIPT_PROMPT,
+  RENDER_SHAPE_SCRIPT_SCHEMA,
+  RENDER_TOOL_TIMEOUT_MS,
+  renderOptionsFrom,
+  savedMessage,
+} from "./tool";
+export type { RenderToolDeps, RenderToolResult } from "./tool";

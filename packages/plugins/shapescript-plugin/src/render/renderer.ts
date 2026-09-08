@@ -74,13 +74,19 @@ export interface RenderShapeScriptOptions {
  *  the script is at fault. */
 export class RenderUnavailableError extends Error {}
 
-/** Report a fault that did not fail the render, without letting the report
- *  become one. The callback is the HOST's code: it runs inside the `finally`
- *  that releases the browser, so a synchronous throw from it would reject that
- *  block and replace a finished PNG with a logging error (CodeRabbit on #3059). */
-function warn(options: RenderShapeScriptOptions, message: string): void {
+/** Report something the host should record, without letting the report become
+ *  the outcome. The callback is the HOST's code, and it is called from paths
+ *  whose whole purpose is to answer gracefully — the `finally` that releases the
+ *  browser after a finished render (CodeRabbit on #3059), and the
+ *  browser-unavailable branch that returns install guidance (codex on #3060). A
+ *  synchronous throw from a logger must not turn either into a rejection.
+ *
+ *  Exported because both callers need the same guarantee and one of them lives
+ *  in `./tool`; two copies of "wrap the host's logger" is exactly the kind of
+ *  thing that ends up guarded in one place and not the other. */
+export function safeWarn(onWarning: ((message: string) => void) | undefined, message: string): void {
   try {
-    options.onWarning?.(message);
+    onWarning?.(message);
   } catch {
     // A logger that throws is the host's problem, not this render's.
   }
@@ -285,6 +291,6 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
     // that just succeeded, so it must not replace the result with an error. The
     // host has the logger; this package reports it through `onWarning` when one
     // was supplied.
-    await browser.close().catch((err: unknown) => warn(options, `chromium close failed: ${errorMessage(err)}`));
+    await browser.close().catch((err: unknown) => safeWarn(options.onWarning, `chromium close failed: ${errorMessage(err)}`));
   }
 }
