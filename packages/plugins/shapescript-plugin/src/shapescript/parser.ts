@@ -1640,11 +1640,24 @@ export class Parser {
     const nodes: SceneNode[] = [];
 
     while (this.current().type !== TokenType.EOF) {
+      const before = this.pos;
       const node = this.parseNode();
       if (node) {
         nodes.push(node);
       }
       this.skipNewlines();
+      // `parseNode()` answers `null` at a `}` so that a BLOCK's loop stops there
+      // and the block itself consumes the brace. At the TOP level there is no
+      // block to close: nothing consumes the token, `this.pos` does not move, and
+      // this loop spins on the same `}` forever. That is not a hang in a worker —
+      // the parse is synchronous, so it pins the whole host process (one stray
+      // trailing `}` in an agent-written model stopped MulmoTerminal's server from
+      // answering any request at all). An unmatched brace is a parse error; report
+      // it as one.
+      if (node === null && this.pos === before) {
+        const token = this.current();
+        throw new ParseError(`Unexpected token: ${token.type}`, token.line, token.column);
+      }
     }
 
     return nodes;
