@@ -12,8 +12,8 @@ import path from "node:path";
 import { saveImage } from "../../utils/files/image-store.js";
 import { resolveByPath } from "../../utils/files/by-path.js";
 import { workspacePath } from "../../workspace/workspace.js";
-import { renderShapeScriptSheet, RenderUnavailableError, RENDER_BUDGET_MS } from "../../utils/render/shapeScriptRenderer.js";
-import type { ViewAngle } from "../../utils/render/shapeScriptPage.js";
+import { renderShapeScriptSheet, RenderUnavailableError, RENDER_BUDGET_MS } from "@mulmoclaude/shapescript-plugin/render";
+import type { ViewAngle } from "@mulmoclaude/shapescript-plugin/render";
 import { errorMessage } from "../../utils/errors.js";
 import { log } from "../../system/logger/index.js";
 import { ONE_SECOND_MS } from "../../utils/time.js";
@@ -158,6 +158,7 @@ export const renderShapeScript: McpTool = {
     try {
       const base64 = await renderShapeScriptSheet({
         script,
+        onWarning: (message) => log.warn("render", message),
         views,
         width: clampTile(args.width, DEFAULT_TILE),
         height: clampTile(args.height, DEFAULT_TILE),

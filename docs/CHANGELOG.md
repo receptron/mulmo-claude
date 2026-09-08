@@ -8,6 +8,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+### Changed
+
+#### `@mulmoclaude/shapescript-plugin@1.2.0` — the renderer moves into the package
+
+`renderShapeScriptSheet` — the Puppeteer-driven rasteriser behind the `renderShapeScript` MCP tool
+— moves from this host's `server/utils/render/` into a new server-only `@mulmoclaude/shapescript-plugin/render`
+subpath. Nothing about the tool changes here; what changes is that MulmoTerminal can now serve the
+same tool from the same code instead of a copy. Copying it would have duplicated ~250 lines of
+non-obvious work (the intercepted fake origin, the two-file three.js serve, the timeout budget) in
+two repositories that are already known to drift apart.
+
+Two consequences worth noting. `three` is no longer a dependency of this host or the launcher: the
+render page is served three's own build files, and the plugin — which already depends on three for
+the geometry — resolves them from its own copy. And Puppeteer is now an OPTIONAL peer of the
+plugin rather than an assumed host dependency, so a host that does not want a browser download is
+not made to take one.
+
+
 ### Added
 
 #### `@mulmoclaude/shapescript-plugin@1.1.0` — ShapeScript models are files, and `renderShapeScript` lets the agent see them
@@ -92,7 +110,7 @@ the same way.
 An unmatched brace is now a `PARSE_ERROR` reported at its own line and column, like every other
 diagnostic `presentShapeScript` returns.
 
-Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.1.1`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.2.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 

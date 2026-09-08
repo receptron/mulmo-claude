@@ -13,6 +13,7 @@ name, and the `Present3D*` type names, are renamed throughout.
 | Entry         | Contents                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `.`           | `TOOL_NAME`, `TOOL_DEFINITION`, `executePresentShapeScript`, `pluginCore`, `samples`, `parseShapeScript`, `astToThreeJS`, `executeShapeScriptDispatch` + the `artifacts/shapes` path rules |
+| `./render`    | **server-only** — `renderShapeScriptSheet` and the render page. Rasterises a model to a PNG with Puppeteer's headless Chromium (an OPTIONAL peer); a host without one gets `RenderUnavailableError` carrying the install hint. |
 | `./vue`       | the `ToolPlugin` (View + Preview + `SYSTEM_PROMPT`), plus everything on `.`                                              |
 | `./style.css` | the compiled component styles (Vite lib mode does not auto-inject them)                                                  |
 
