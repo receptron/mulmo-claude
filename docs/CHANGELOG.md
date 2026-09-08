@@ -74,7 +74,25 @@ diagnostic (`PARSE_ERROR` / `EVALUATION_ERROR` / `LIMIT_EXCEEDED`, with the line
 where it can be known) instead of opening an empty viewport. `rnd` / `rand()` draw from a
 seeded generator so the server's validation and the browser's render cannot disagree.
 
-Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.1.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+### Fixed
+
+#### `@mulmoclaude/shapescript-plugin@1.1.1` — a stray `}` in a model hung the parser, and with it the whole host (PR #3058)
+
+`parseShapeScript("cube { size 1 }\n}")` never returned. `parseNode()` answers `null` at a
+`}` — that is how a BLOCK's loop stops, leaving the block itself to consume the brace. At the
+TOP level there is no block to close: nothing consumed the token, the position did not move,
+and the top-level loop spun on that same `}` forever.
+
+The parse is synchronous and runs in-process, so this was not one stuck request. It pinned the
+host: a 4394-character agent-written model with one extra `}` on its last line (41 to 40) left
+MulmoTerminal's server still LISTENing on its port at 100% CPU, accepting nothing, with every
+`/api/*` call and websocket timing out until it was restarted. MulmoClaude runs the same plugin
+the same way.
+
+An unmatched brace is now a `PARSE_ERROR` reported at its own line and column, like every other
+diagnostic `presentShapeScript` returns.
+
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.1.1`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 
