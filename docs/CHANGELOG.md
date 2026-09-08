@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ### Changed
 
-#### `@mulmoclaude/shapescript-plugin@1.2.0` — the renderer moves into the package
+#### `@mulmoclaude/shapescript-plugin@1.3.0` — the render TOOL moves in too
 
 `renderShapeScriptSheet` — the Puppeteer-driven rasteriser behind the `renderShapeScript` MCP tool
 — moves from this host's `server/utils/render/` into a new server-only `@mulmoclaude/shapescript-plugin/render`
@@ -24,6 +24,12 @@ render page is served three's own build files, and the plugin — which already 
 the geometry — resolves them from its own copy. And Puppeteer is now an OPTIONAL peer of the
 plugin rather than an assumed host dependency, so a host that does not want a browser download is
 not made to take one.
+
+**1.3.0** finishes the move: the tool's schema, defaults, four-view sheet and result sentence go
+with it as `executeRenderShapeScript`, leaving each host only what is genuinely its own — reading a
+`.shape` through its file layer, saving into its image store, and its logger. 1.2.0 shared the
+renderer but left the tool wrapper behind, and porting to MulmoTerminal made that immediately
+visible: the parts a MODEL sees would have been the duplicated ones.
 
 
 ### Added
@@ -110,7 +116,7 @@ the same way.
 An unmatched brace is now a `PARSE_ERROR` reported at its own line and column, like every other
 diagnostic `presentShapeScript` returns.
 
-Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.2.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
+Ships `@mulmoclaude/accounting-plugin@3.0.0`, `@mulmoclaude/chart-plugin@3.0.0`, `@mulmoclaude/collection-plugin@4.6.0`, `@mulmoclaude/common@1.2.0`, `@mulmoclaude/core@4.8.0`, `@mulmoclaude/form-plugin@2.0.0`, `@mulmoclaude/google-plugin@3.0.0`, `@mulmoclaude/html-plugin@4.0.0`, `@mulmoclaude/markdown-plugin@4.1.0`, `@mulmoclaude/markdown-utils@2.2.0`, `@mulmoclaude/mulmoscript-plugin@4.6.0`, `@mulmoclaude/shapescript-plugin@1.3.0`, `@mulmoclaude/spotify-plugin@2.0.0`, `@mulmoclaude/x-plugin@1.0.3`.
 
 ---
 
