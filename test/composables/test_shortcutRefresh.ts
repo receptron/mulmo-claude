@@ -163,3 +163,48 @@ describe("reconcileShortcuts", () => {
     assert.deepEqual(reconcileShortcuts([], "collection", rowsFor({ slug: "x", title: "X", icon: "inbox" })), { next: [], drifted: false });
   });
 });
+
+describe("refreshShortcut / reconcileShortcuts — fields this build does not name (#3055)", () => {
+  // `config/shortcuts.json` is shared with MulmoTerminal. An index here is
+  // authoritative about title / icon / colour and about nothing else, so a
+  // field only the other app writes must survive a reconcile — otherwise the
+  // server carrying it through (#3055) is undone the first time someone opens
+  // an index and anything drifted.
+  //
+  // The type is deliberately not widened: the extra key exists in the FILE, not
+  // in what this build declares, which is exactly the situation under test.
+  // Spread rather than cast — an object literal with an extra key is rejected
+  // outright, and `as` would hide a genuine mismatch in the rest of the shape.
+  const carryingExtra = (entry: Shortcut, extra: Record<string, unknown>): Shortcut => ({ ...extra, ...entry });
+  const carrying = carryingExtra({ kind: "collection", slug: "lens", title: "Lens", icon: "photo_camera" }, { futureField: "from another build" });
+
+  it("keeps a field the index says nothing about", () => {
+    assert.deepEqual(refreshShortcut(carrying, { title: "Renamed", icon: "photo_camera" }), {
+      kind: "collection",
+      slug: "lens",
+      title: "Renamed",
+      icon: "photo_camera",
+      futureField: "from another build",
+    });
+  });
+
+  it("still settles after one refresh — a carried field never re-triggers drift", () => {
+    const fresh: ShortcutRefreshSource = { title: "Renamed", icon: "photo_camera" };
+    assert.equal(hasShortcutDrifted(refreshShortcut(carrying, fresh), fresh), false);
+  });
+
+  it("carries it through a reconcile that rewrites the entry", () => {
+    const rows: ShortcutRefreshRow[] = [{ slug: "lens", title: "Renamed", icon: "photo_camera" }];
+    const once = reconcileShortcuts([carrying], "collection", rows);
+    assert.equal(once.drifted, true);
+    assert.deepEqual(once.next, [{ kind: "collection", slug: "lens", title: "Renamed", icon: "photo_camera", futureField: "from another build" }]);
+    assert.equal(reconcileShortcuts(once.next, "collection", rows).drifted, false);
+  });
+
+  it("does NOT resurrect a colour the index dropped (#2987 stays fixed)", () => {
+    const coloured = carryingExtra({ kind: "collection", slug: "lens", title: "Lens", icon: "photo_camera", color: "violet" }, { futureField: "kept" });
+    const refreshed = refreshShortcut(coloured, { title: "Lens", icon: "photo_camera" });
+    assert.equal("color" in refreshed, false);
+    assert.deepEqual(refreshed, { kind: "collection", slug: "lens", title: "Lens", icon: "photo_camera", futureField: "kept" });
+  });
+});

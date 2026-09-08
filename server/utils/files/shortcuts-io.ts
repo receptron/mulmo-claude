@@ -7,27 +7,31 @@ import { WORKSPACE_FILES, workspacePath } from "../../workspace/paths.js";
 import { writeFileAtomic } from "./atomic.js";
 import { readTextSafe } from "./safe.js";
 import { isRecord } from "../types.js";
-import { SHORTCUT_KINDS, sameShortcut, type Shortcut, type ShortcutsFile } from "../../../src/types/shortcuts.js";
+import { SHORTCUT_KINDS, sameShortcut, unknownShortcutFields, type Shortcut, type ShortcutsFile } from "../../../src/types/shortcuts.js";
 import { isAccentColor } from "@mulmoclaude/core/collection";
 
 function shortcutsFilePath(workspaceRoot?: string): string {
   return path.join(workspaceRoot ?? workspacePath, WORKSPACE_FILES.shortcuts);
 }
 
-/** Coerce arbitrary JSON into a clean `Shortcut[]`: drop malformed
- *  entries (bad kind / empty slug / non-string fields) and dedupe on
- *  `(kind, slug)` keeping the first occurrence. Exported for the route
- *  validator and unit tests — pure, no IO.
- *
- *  This REBUILDS each entry rather than filtering the input, so any field it
- *  does not name is silently dropped on every write — pin, unpin, reorder and
- *  reconcile all pass through here. A new `Shortcut` field that is not listed
- *  below never survives being persisted (#2987). */
 /** One raw JSON value as a `Shortcut`, or null when it cannot be one.
  *
  *  Split out of the loop below so each concern stays readable on its own: this
  *  answers "what IS a shortcut entry", the caller answers "which of them do we
- *  keep". */
+ *  keep".
+ *
+ *  KEYS THIS BUILD DOES NOT KNOW ARE KEPT (#3055). The file is shared with
+ *  MulmoTerminal and both apps rebuild every record they write — pin, unpin,
+ *  reorder and reconcile all pass through here — so a field only one of them
+ *  names is deleted by the other. `color` was exactly that, in both directions
+ *  (#2987 / mulmoterminal#1993); MulmoTerminal carries the rest through since
+ *  its #1996, and this is the symmetric half.
+ *
+ *  Carried, NOT merged: what goes back is what came in, so a field the OTHER app
+ *  has just removed stays removed rather than being resurrected here.
+ *
+ *  The known fields are applied LAST, so a validated value always beats whatever
+ *  the file held. */
 function toShortcut(raw: unknown): Shortcut | null {
   if (!isRecord(raw)) return null;
   const { slug, title, icon, color } = raw;
@@ -37,6 +41,7 @@ function toShortcut(raw: unknown): Shortcut | null {
   if (kind === undefined) return null;
   if (typeof slug !== "string" || slug.length === 0) return null;
   return {
+    ...unknownShortcutFields(raw),
     kind,
     slug,
     title: typeof title === "string" ? title : slug,
@@ -48,6 +53,11 @@ function toShortcut(raw: unknown): Shortcut | null {
   };
 }
 
+/** Coerce arbitrary JSON into a clean `Shortcut[]`: drop entries with an unknown
+ *  kind or a missing / non-string / empty slug — a non-string `title` or `icon`
+ *  is DEFAULTED rather than fatal — and dedupe on `(kind, slug)` keeping the
+ *  first occurrence. Exported for the route validator and unit tests — pure,
+ *  no IO. */
 export function normalizeShortcuts(input: unknown): Shortcut[] {
   if (!Array.isArray(input)) return [];
   const out: Shortcut[] = [];
