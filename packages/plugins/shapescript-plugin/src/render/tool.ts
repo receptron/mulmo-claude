@@ -8,7 +8,7 @@
 // host-side is genuinely host-shaped: reading a `.shape` through that host's file
 // capability, and saving an image where that host keeps images.
 
-import { renderShapeScriptSheet, RenderUnavailableError, RENDER_BUDGET_MS } from "./renderer";
+import { renderShapeScriptSheet, RenderUnavailableError, RENDER_BUDGET_MS, safeWarn } from "./renderer";
 import type { ViewAngle } from "./page";
 
 const DEFAULT_AZIMUTH = 30;
@@ -201,7 +201,9 @@ export async function executeRenderShapeScript(deps: RenderToolDeps, args: Recor
     if (err instanceof RenderUnavailableError) {
       // Told to the host as well as the model: to the operator this is a
       // degraded service, not a normal completion.
-      deps.onWarning?.(`renderShapeScript: unavailable — ${err.message}`);
+      // Guarded: this branch exists to answer gracefully, and a host logger that
+      // throws must not turn the install guidance into a rejection (codex on #3060).
+      safeWarn(deps.onWarning, `renderShapeScript: unavailable — ${err.message}`);
       return { message: err.message, rendered: false };
     }
     throw err;
