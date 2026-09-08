@@ -130,7 +130,9 @@ export interface RenderToolDeps {
    *  Absolute or relative is the host's call: it depends on where its sessions
    *  run, and only the host knows that. */
   saveImage: (base64: string) => Promise<string>;
-  /** Optional host logger for a fault that did not fail the render. */
+  /** Optional host logger for anything the host should record but the model does
+   *  not need as an error — a browser that would not close, and the unavailable
+   *  browser below. */
   onWarning?: (message: string) => void;
 }
 
@@ -143,33 +145,65 @@ async function resolveScript(deps: RenderToolDeps, args: Record<string, unknown>
   throw new Error("Provide either `script` (inline source) or `path` (an existing .shape file)");
 }
 
-/**
- * Run one `renderShapeScript` call and answer with the sentence the agent reads.
+/** What one call did. `rendered: false` means the tool answered without an image
+ *  — today only a host with no usable browser.
  *
- * A missing browser comes back as that sentence rather than a throw: the model
- * can do nothing about it, and the useful response is the install hint plus
- * "carry on without me". Everything else throws, so a host's own error path
- * reports it.
+ *  The flag exists because the two outcomes look identical from the outside: both
+ *  return a sentence for the model. Before the extraction the host logged
+ *  `unavailable` on this path and `ok` on the other; collapsing them to a string
+ *  made a missing Chromium invisible to host monitoring while the host went on
+ *  logging success (codex on #3060). A host that ignores the flag still behaves
+ *  correctly — it just cannot tell the two apart, which is the caller's choice
+ *  to make rather than this function's. */
+export interface RenderToolResult {
+  /** The sentence the agent reads — the saved path, or why there is none. */
+  message: string;
+  rendered: boolean;
+}
+
+/**
+ * Run one `renderShapeScript` call.
+ *
+ * A missing browser comes back as a message rather than a throw: the model can
+ * do nothing about it, and the useful response is the install hint plus "carry
+ * on without me". Everything else throws, so a host's own error path reports it.
  */
-export async function executeRenderShapeScript(deps: RenderToolDeps, args: Record<string, unknown>): Promise<string> {
+/** The renderer's options for one call: every model-supplied number defaulted and
+ *  clamped, so nothing downstream has to wonder whether it was checked. */
+export function renderOptionsFrom(args: Record<string, unknown>, script: string, views: readonly ViewAngle[], onWarning?: (message: string) => void) {
+  return {
+    script,
+    views,
+    width: clampTile(args.width, DEFAULT_TILE),
+    height: clampTile(args.height, DEFAULT_TILE),
+    zoom: Math.max(num(args.zoom, DEFAULT_ZOOM), 0.01),
+    projection: args.projection === "orthographic" ? ("orthographic" as const) : ("perspective" as const),
+    ...(onWarning ? { onWarning } : {}),
+  };
+}
+
+/** What the model is told about a sheet that WAS produced. The captions are
+ *  repeated here rather than left to the image alone: a model that has not opened
+ *  the file yet still knows which angles it is about to see. */
+export function savedMessage(imagePath: string, views: readonly ViewAngle[]): string {
+  const captions = views.map((angle) => angle.label).join("; ");
+  const count = views.length === 1 ? "1 view" : `${views.length} views`;
+  return `Saved render to ${imagePath} (${count}: ${captions}). Read that file to see the model.`;
+}
+
+export async function executeRenderShapeScript(deps: RenderToolDeps, args: Record<string, unknown>): Promise<RenderToolResult> {
   const script = await resolveScript(deps, args);
   const views = viewAngles(num(args.azimuth, DEFAULT_AZIMUTH), num(args.elevation, DEFAULT_ELEVATION), args.views === "single");
   try {
-    const base64 = await renderShapeScriptSheet({
-      script,
-      views,
-      width: clampTile(args.width, DEFAULT_TILE),
-      height: clampTile(args.height, DEFAULT_TILE),
-      zoom: Math.max(num(args.zoom, DEFAULT_ZOOM), 0.01),
-      projection: args.projection === "orthographic" ? "orthographic" : "perspective",
-      ...(deps.onWarning ? { onWarning: deps.onWarning } : {}),
-    });
-    const imagePath = await deps.saveImage(base64);
-    const captions = views.map((angle) => angle.label).join("; ");
-    const count = views.length === 1 ? "1 view" : `${views.length} views`;
-    return `Saved render to ${imagePath} (${count}: ${captions}). Read that file to see the model.`;
+    const base64 = await renderShapeScriptSheet(renderOptionsFrom(args, script, views, deps.onWarning));
+    return { message: savedMessage(await deps.saveImage(base64), views), rendered: true };
   } catch (err) {
-    if (err instanceof RenderUnavailableError) return err.message;
+    if (err instanceof RenderUnavailableError) {
+      // Told to the host as well as the model: to the operator this is a
+      // degraded service, not a normal completion.
+      deps.onWarning?.(`renderShapeScript: unavailable — ${err.message}`);
+      return { message: err.message, rendered: false };
+    }
     throw err;
   }
 }

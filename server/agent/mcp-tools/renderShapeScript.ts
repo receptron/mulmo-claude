@@ -56,7 +56,7 @@ export const renderShapeScript: McpTool = {
   prompt: RENDER_SHAPE_SCRIPT_PROMPT,
   handler: async (args: Record<string, unknown>): Promise<string> => {
     log.info("render", "renderShapeScript: start", { args: Object.keys(args).join(",") });
-    const message = await executeRenderShapeScript(
+    const { message, rendered } = await executeRenderShapeScript(
       {
         readShape: readShapeFile,
         saveImage,
@@ -64,7 +64,10 @@ export const renderShapeScript: McpTool = {
       },
       args,
     );
-    log.info("render", "renderShapeScript: done");
+    // `rendered` is the difference between a saved image and a host with no
+    // usable browser. Both answer the model with a sentence, so without the flag
+    // a degraded service logs exactly like a working one.
+    log.info("render", rendered ? "renderShapeScript: ok" : "renderShapeScript: answered without an image", { message });
     return message;
   },
 };
