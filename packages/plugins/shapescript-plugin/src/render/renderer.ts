@@ -5,22 +5,33 @@
 // Chromium as `toJSON()`, and screenshotted from several angles onto one
 // contact sheet.
 //
-// The browser is Puppeteer's — the same one `server/api/routes/pdf.ts` already
-// drives, and a production dependency of the launcher, so an npm-installed host
-// can render without installing anything. It is still imported lazily and
-// failure is still reported as an install hint rather than a crash: a host that
-// set `PUPPETEER_SKIP_DOWNLOAD`, or a sandbox that cannot spawn a browser, has
-// no Chromium and should hear why.
+// The browser is Puppeteer's, declared as an OPTIONAL PEER: both hosts already
+// depend on it (MulmoClaude drives it for PDF export, MulmoTerminal likewise), so
+// the common case needs no new install, while a host without it is not forced to
+// take a browser download for a feature it does not use. It is imported lazily and
+// failure is reported as an install hint rather than a crash — a host that set
+// `PUPPETEER_SKIP_DOWNLOAD`, or a sandbox that cannot spawn a browser, has no
+// Chromium and should hear why.
+//
+// This module is SERVER-ONLY (`@mulmoclaude/shapescript-plugin/render`): it reads
+// files and spawns a process, so it must never reach the browser bundle.
 
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
-import { astToThreeJS, parseShapeScript } from "@mulmoclaude/shapescript-plugin";
-import { errorMessage } from "../errors.js";
-import { isRecord } from "../types.js";
-import { log } from "../../system/logger/index.js";
-import { ONE_SECOND_MS } from "../time.js";
-import { buildRenderPage, type ViewAngle } from "./shapeScriptPage.js";
+import { astToThreeJS } from "../shapescript/toThreeJS";
+import { parseShapeScript } from "../shapescript/parser";
+import { isRecord } from "../core/contract";
+import { buildRenderPage, type ViewAngle } from "./page";
+
+const ONE_SECOND_MS = 1_000;
+
+/** The message of an unknown thrown value. Local rather than imported from a host:
+ *  this package is consumed by two of them and depends on neither. */
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /** How long one contact sheet may take in the browser before we give up. The
  *  geometry budget already bounds the model; this bounds the rasterisation. */
@@ -51,6 +62,11 @@ export interface RenderShapeScriptOptions {
   height: number;
   zoom: number;
   projection: "perspective" | "orthographic";
+  /** Reported for a fault that did not fail the render — currently only a browser
+   *  that would not close. Optional because this package has no logger of its own:
+   *  each host passes its own, and one that passes none loses the line rather than
+   *  the render. */
+  onWarning?: (message: string) => void;
 }
 
 /** Thrown when the host cannot rasterise at all — a missing browser, not a bad
@@ -58,7 +74,21 @@ export interface RenderShapeScriptOptions {
  *  the script is at fault. */
 export class RenderUnavailableError extends Error {}
 
-const require = createRequire(import.meta.url);
+// This module is built twice — ESM and, for hosts running CJS, CommonJS — and the
+// two disagree about how a file locates itself. `import.meta` is rewritten to an
+// empty object in the CJS output, so resolving three from `import.meta.url` alone
+// would throw there; `__filename` is what exists instead, and does not exist in
+// ESM. Each branch runs only in the build that has it.
+declare const __filename: string | undefined;
+
+function moduleUrl(): string {
+  const url = (import.meta as { url?: string } | undefined)?.url;
+  if (typeof url === "string" && url.length > 0) return url;
+  if (typeof __filename === "string") return pathToFileURL(__filename).href;
+  throw new Error("shapescript render: cannot locate this module to resolve three from");
+}
+
+const require = createRequire(moduleUrl());
 
 interface LauncherLike {
   launch: (options: object) => Promise<BrowserLike>;
@@ -208,7 +238,8 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
     try {
       await page.waitForFunction("typeof window.__shapeSheet === 'string'", { timeout: RENDER_TIMEOUT_MS });
     } catch (err) {
-      throw new Error(pageErrors.length > 0 ? `the render page failed: ${pageErrors.join("; ")}` : errorMessage(err));
+      const symptom = pageErrors.length > 0 ? `the render page failed: ${pageErrors.join("; ")}` : errorMessage(err);
+      throw new Error(symptom, { cause: err });
     }
     const dataUrl = await page.evaluate("window.__shapeSheet");
     if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) {
@@ -216,6 +247,10 @@ export async function renderShapeScriptSheet(options: RenderShapeScriptOptions):
     }
     return dataUrl.slice("data:image/png;base64,".length);
   } finally {
-    await browser.close().catch((err: unknown) => log.warn("render", "chromium close failed", { error: errorMessage(err) }));
+    // A failed close leaks a browser process but does not invalidate the render
+    // that just succeeded, so it must not replace the result with an error. The
+    // host has the logger; this package reports it through `onWarning` when one
+    // was supplied.
+    await browser.close().catch((err: unknown) => options.onWarning?.(`chromium close failed: ${errorMessage(err)}`));
   }
 }

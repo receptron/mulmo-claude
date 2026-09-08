@@ -18,7 +18,21 @@ export default createVuePluginConfig({
     index: resolve(__dirname, "src/index.ts"),
     core: resolve(__dirname, "src/core/index.ts"),
     vue: resolve(__dirname, "src/vue/index.ts"),
+    render: resolve(__dirname, "src/render/index.ts"),
   },
   name: "MulmoClaudePluginShapeScript",
-  external: [/^@mulmoclaude\/core/, "vue", "gui-chat-protocol", "gui-chat-protocol/vue"],
+  // `puppeteer` and the node built-ins belong to the SERVER-only `./render` entry:
+  // external so a browser driver is never bundled, and so the host's own hoisted
+  // copy is the one that runs.
+  external: [
+    /^@mulmoclaude\/core/,
+    "vue",
+    "gui-chat-protocol",
+    "gui-chat-protocol/vue",
+    "puppeteer",
+    "node:fs/promises",
+    "node:module",
+    "node:path",
+    "node:url",
+  ],
 });
