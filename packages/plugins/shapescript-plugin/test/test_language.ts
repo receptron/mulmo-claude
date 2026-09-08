@@ -46,7 +46,7 @@ describe("validation before presentation", () => {
     // A `}` with no block open. `parseNode()` answers null there (that is how a
     // block's loop stops) so nothing consumed it, and the top-level loop used to
     // spin on it forever — synchronously, taking the whole host process with it.
-    ["cube { size 1 }\n}", "PARSE_ERROR", /Unexpected token/],
+    ["cube { size 1 }\n}", "PARSE_ERROR", /line 2, column 1: Unexpected token: RBRACE/],
   ] as const) {
     it(`returns a diagnostic for ${script}`, async () => {
       const result = await executePresentShapeScript(context, { title: "Invalid", script });

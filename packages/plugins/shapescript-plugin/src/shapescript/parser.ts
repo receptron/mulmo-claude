@@ -1636,28 +1636,30 @@ export class Parser {
     }
   }
 
+  // `parseNode()` answers `null` at a `}` so that a BLOCK's loop stops there and the
+  // block itself consumes the brace. At the TOP level there is no block to close: if
+  // nothing consumed the token, `this.pos` has not moved and `parse()` would spin on
+  // that same `}` forever. That is not one hung request — the parse is synchronous, so
+  // it pins the whole host process (one stray trailing `}` in an agent-written model
+  // stopped MulmoTerminal's server from answering anything at all). An unmatched brace
+  // is a parse error; report it as one, at its own line and column.
+  private refuseStalledToken(posBefore: number): void {
+    if (this.pos !== posBefore) return;
+    const token = this.current();
+    throw new ParseError(`Unexpected token: ${token.type}`, token.line, token.column);
+  }
+
   parse(): SceneNode[] {
     const nodes: SceneNode[] = [];
 
     while (this.current().type !== TokenType.EOF) {
-      const before = this.pos;
+      const posBefore = this.pos;
       const node = this.parseNode();
       if (node) {
         nodes.push(node);
       }
       this.skipNewlines();
-      // `parseNode()` answers `null` at a `}` so that a BLOCK's loop stops there
-      // and the block itself consumes the brace. At the TOP level there is no
-      // block to close: nothing consumes the token, `this.pos` does not move, and
-      // this loop spins on the same `}` forever. That is not a hang in a worker —
-      // the parse is synchronous, so it pins the whole host process (one stray
-      // trailing `}` in an agent-written model stopped MulmoTerminal's server from
-      // answering any request at all). An unmatched brace is a parse error; report
-      // it as one.
-      if (node === null && this.pos === before) {
-        const token = this.current();
-        throw new ParseError(`Unexpected token: ${token.type}`, token.line, token.column);
-      }
+      if (node === null) this.refuseStalledToken(posBefore);
     }
 
     return nodes;
